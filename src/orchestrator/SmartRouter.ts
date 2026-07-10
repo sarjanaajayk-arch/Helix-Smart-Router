@@ -1,6 +1,7 @@
-import { ProviderManager } from "../providers/ProviderManager";
+import { RouterConfig } from "../config/RouterConfig";
 import { RoutingRequest } from "../models/RoutingRequest";
 import { RoutingResponse } from "../models/RoutingResponse";
+import { ProviderManager } from "../providers/ProviderManager";
 import { RoutingRules } from "./RoutingRules";
 
 export class SmartRouter {
@@ -9,12 +10,11 @@ export class SmartRouter {
     ) {}
 
     /**
-     * Converts a RoutingRequest into the provider message format.
+     * Converts a RoutingRequest into provider messages.
      */
-    private buildMessages(request: RoutingRequest): {
-        role: "user";
-        content: string;
-    }[] {
+    private buildMessages(
+        request: RoutingRequest
+    ): { role: "user"; content: string }[] {
         return [
             {
                 role: "user",
@@ -24,19 +24,35 @@ export class SmartRouter {
     }
 
     /**
-     * Routes a standard (non-streaming) request.
+     * Selects the provider for a request.
+     */
+    private selectProvider(
+        request: RoutingRequest
+    ) {
+        if (!RouterConfig.enableSmartRouting) {
+            return RouterConfig.defaultProvider;
+        }
+
+        return RoutingRules.selectProvider(
+            request.taskType
+        );
+    }
+
+    /**
+     * Routes a normal request.
      */
     async route(
         request: RoutingRequest
     ): Promise<RoutingResponse> {
-        const providerName = RoutingRules.selectProvider(
-            request.taskType
-        );
 
-        const response = await this.providerManager.executeChat(
-            providerName,
-            this.buildMessages(request)
-        );
+        const providerName =
+            this.selectProvider(request);
+
+        const response =
+            await this.providerManager.executeChat(
+                providerName,
+                this.buildMessages(request)
+            );
 
         return {
             content: response.content,
@@ -50,15 +66,16 @@ export class SmartRouter {
      */
     async *routeStream(
         request: RoutingRequest
-    ): AsyncGenerator<string, void, unknown> {
-        const providerName = RoutingRules.selectProvider(
-            request.taskType
-        );
+    ): AsyncGenerator<string> {
 
-        const stream = this.providerManager.executeChatStream(
-            providerName,
-            this.buildMessages(request)
-        );
+        const providerName =
+            this.selectProvider(request);
+
+        const stream =
+            this.providerManager.executeChatStream(
+                providerName,
+                this.buildMessages(request)
+            );
 
         for await (const chunk of stream) {
             yield chunk;
