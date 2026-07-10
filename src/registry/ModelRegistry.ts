@@ -21,6 +21,9 @@ export const MODEL_REGISTRY: AIModel[] = [
 
         enabled: true,
 
+        inputPricePerMillionTokens: 0.30,
+        outputPricePerMillionTokens: 2.50,
+
         capabilities: {
             supportsChat: true,
             supportsVision: true,
@@ -28,6 +31,7 @@ export const MODEL_REGISTRY: AIModel[] = [
             supportsFunctionCalling: true,
             supportsStructuredOutput: true,
             supportsReasoning: true,
+            supportsCoding: true,
             supportsEmbeddings: false,
             supportsImageGeneration: false,
         },
@@ -47,6 +51,9 @@ export const MODEL_REGISTRY: AIModel[] = [
 
         enabled: true,
 
+        inputPricePerMillionTokens: 1.25,
+        outputPricePerMillionTokens: 10.00,
+
         capabilities: {
             supportsChat: true,
             supportsVision: true,
@@ -54,6 +61,7 @@ export const MODEL_REGISTRY: AIModel[] = [
             supportsFunctionCalling: true,
             supportsStructuredOutput: true,
             supportsReasoning: true,
+            supportsCoding: true,
             supportsEmbeddings: false,
             supportsImageGeneration: false,
         },
@@ -77,6 +85,9 @@ export const MODEL_REGISTRY: AIModel[] = [
 
         enabled: true,
 
+        inputPricePerMillionTokens: 0.27,
+        outputPricePerMillionTokens: 1.10,
+
         capabilities: {
             supportsChat: true,
             supportsVision: false,
@@ -84,6 +95,7 @@ export const MODEL_REGISTRY: AIModel[] = [
             supportsFunctionCalling: true,
             supportsStructuredOutput: true,
             supportsReasoning: true,
+            supportsCoding: true,
             supportsEmbeddings: false,
             supportsImageGeneration: false,
         },
@@ -103,6 +115,9 @@ export const MODEL_REGISTRY: AIModel[] = [
 
         enabled: true,
 
+        inputPricePerMillionTokens: 0.55,
+        outputPricePerMillionTokens: 2.19,
+
         capabilities: {
             supportsChat: true,
             supportsVision: false,
@@ -110,6 +125,7 @@ export const MODEL_REGISTRY: AIModel[] = [
             supportsFunctionCalling: true,
             supportsStructuredOutput: true,
             supportsReasoning: true,
+            supportsCoding: true,
             supportsEmbeddings: false,
             supportsImageGeneration: false,
         },

@@ -47,6 +47,22 @@ export class MetricsManager {
             totalLatency: 0,
             averageLatency: 0,
         },
+
+        [ProviderType.GITHUB]: {
+            usage: 0,
+            successes: 0,
+            failures: 0,
+            totalLatency: 0,
+            averageLatency: 0,
+        },
+
+        [ProviderType.GROQ]: {
+            usage: 0,
+            successes: 0,
+            failures: 0,
+            totalLatency: 0,
+            averageLatency: 0,
+        },
     };
 
     static recordRequest(): void {
@@ -156,6 +172,22 @@ export class MetricsManager {
             },
 
             [ProviderType.OPENROUTER]: {
+                usage: 0,
+                successes: 0,
+                failures: 0,
+                totalLatency: 0,
+                averageLatency: 0,
+            },
+
+            [ProviderType.GITHUB]: {
+                usage: 0,
+                successes: 0,
+                failures: 0,
+                totalLatency: 0,
+                averageLatency: 0,
+            },
+
+            [ProviderType.GROQ]: {
                 usage: 0,
                 successes: 0,
                 failures: 0,

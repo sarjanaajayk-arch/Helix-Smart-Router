@@ -2,7 +2,9 @@ import { ProviderType } from "../types/ProviderType";
 import { ModelCapabilities } from "./ModelCapabilities";
 
 export interface AIModel {
+
     id: string;
+
     name: string;
 
     provider: ProviderType;
@@ -16,6 +18,10 @@ export interface AIModel {
     temperature: number;
 
     enabled: boolean;
+
+    inputPricePerMillionTokens: number;
+
+    outputPricePerMillionTokens: number;
 
     capabilities: ModelCapabilities;
 }

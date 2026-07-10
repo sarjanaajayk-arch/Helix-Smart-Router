@@ -66,14 +66,14 @@ export class ProviderManager {
         } catch (error) {
             const latency = Date.now() - startTime;
 
-       HealthMonitor.recordFailure(providerName as ProviderType);
+            HealthMonitor.recordFailure(providerName as ProviderType);
             MetricsManager.recordFailure(providerName as ProviderType, latency);
 
             throw error;
         }
     }
 
-        async executeChat(
+    async executeChat(
         providerName: string,
         messages: ChatMessage[],
         model: string = "unknown"
@@ -115,7 +115,7 @@ export class ProviderManager {
                 stream: false,
             });
 
-                     return await this.executeWithMetrics(
+            return await this.executeWithMetrics(
                 nextProvider.provider,
                 messages,
                 model
