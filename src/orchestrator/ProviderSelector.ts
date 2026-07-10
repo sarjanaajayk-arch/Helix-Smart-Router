@@ -1,6 +1,8 @@
 import { ProviderCapabilities } from "../models/ProviderCapabilities";
 import { TaskType } from "../types/TaskType";
+
 import { CapabilityFilter } from "./CapabilityFilter";
+import { ProviderScorer } from "./ProviderScorer";
 
 export class ProviderSelector {
 
@@ -18,27 +20,20 @@ export class ProviderSelector {
             throw new Error("No compatible AI providers available.");
         }
 
-        availableProviders.sort((a, b) => {
+        let bestProvider = availableProviders[0];
+        let bestScore = ProviderScorer.calculateScore(bestProvider);
 
-            // Higher priority wins
-            if (a.priority !== b.priority) {
-                return a.priority - b.priority;
+        for (const provider of availableProviders.slice(1)) {
+
+            const score = ProviderScorer.calculateScore(provider);
+
+            if (score > bestScore) {
+                bestScore = score;
+                bestProvider = provider;
             }
+        }
 
-            // Lower latency wins
-            if (a.estimatedLatency !== b.estimatedLatency) {
-                return a.estimatedLatency - b.estimatedLatency;
-            }
-
-            // Lower cost wins
-            return (
-                a.costPerMillionInputTokens -
-                b.costPerMillionInputTokens
-            );
-
-        });
-
-        return availableProviders[0];
+        return bestProvider;
     }
 
 }
