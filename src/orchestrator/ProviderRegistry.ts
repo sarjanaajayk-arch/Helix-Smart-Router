@@ -28,4 +28,31 @@ export const PROVIDERS: ProviderCapabilities[] = [
 
         enabled: true,
     },
+
+    {
+        provider: ProviderType.OPENROUTER,
+
+        // Features
+        supportsChat: true,
+        supportsVision: true,
+        supportsCoding: true,
+        supportsReasoning: true,
+        supportsStreaming: true,
+        supportsLongContext: true,
+
+        // Operational metadata
+        priority: 2,
+
+        estimatedLatency: 500,
+
+        costPerMillionInputTokens: 0,
+
+        costPerMillionOutputTokens: 0,
+
+        maxContextWindow: 128_000,
+
+        healthy: true,
+
+        enabled: true,
+    },
 ];
