@@ -8,6 +8,8 @@ export const env = {
   NODE_ENV: process.env.NODE_ENV || "development",
 
   GEMINI_API_KEY: process.env.GEMINI_API_KEY || "",
-
   GEMINI_MODEL: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+
+  OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || "",
+  OPENROUTER_MODEL: process.env.OPENROUTER_MODEL || "openai/gpt-4.1-mini",
 };
