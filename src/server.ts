@@ -2,9 +2,9 @@ import express from "express";
 import cors from "cors";
 
 import { env } from "./config/env";
-import { logger } from "./config/logger";
+import { helixLogger } from "./config/logger";
 
-import { providerManager } from "./providers/ProviderManager";
+import { ProviderManager } from "./providers/ProviderManager";
 import { SmartRouter } from "./orchestrator/SmartRouter";
 import { TaskType } from "./types/TaskType";
 
@@ -12,7 +12,16 @@ import metricsRoutes from "./routes/metricsRoutes";
 import streamRoutes from "./routes/streamRoutes";
 import dashboardRoutes from "./routes/dashboardRoutes";
 
+import { requestIdMiddleware } from "./middlewares/requestIdMiddleware";
+import { requestLoggingMiddleware } from "./middlewares/requestLoggingMiddleware";
+
 const app = express();
+
+/* --------------------------------- */
+/* Core Services */
+/* --------------------------------- */
+
+const providerManager = new ProviderManager();
 const smartRouter = new SmartRouter(providerManager);
 
 /* --------------------------------- */
@@ -21,6 +30,9 @@ const smartRouter = new SmartRouter(providerManager);
 
 app.use(cors());
 app.use(express.json());
+
+app.use(requestIdMiddleware);
+app.use(requestLoggingMiddleware);
 
 /* --------------------------------- */
 /* Routes */
@@ -68,13 +80,7 @@ app.get("/api/test", async (_, res) => {
 
         res.status(200).json(response);
     } catch (error) {
-        logger.error(
-            `Failed to process AI request: ${
-                error instanceof Error
-                    ? error.message
-                    : String(error)
-            }`
-        );
+        helixLogger.error("Failed to process AI request", error);
 
         res.status(500).json({
             error: "Failed to process AI request.",
@@ -87,7 +93,7 @@ app.get("/api/test", async (_, res) => {
 /* --------------------------------- */
 
 app.listen(env.PORT, () => {
-    logger.info(
+    helixLogger.info(
         `🚀 Helix Server running on http://localhost:${env.PORT}`
     );
 });

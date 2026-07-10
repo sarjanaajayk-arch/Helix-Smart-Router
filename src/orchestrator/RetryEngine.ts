@@ -1,5 +1,6 @@
 import { RetryConfig } from "../config/RetryConfig";
 import { MetricsManager } from "../metrics/MetricsManager";
+import { helixLogger } from "../config/logger";
 
 export class RetryEngine {
 
@@ -17,7 +18,15 @@ export class RetryEngine {
 
             try {
 
-                return await operation();
+                const result = await operation();
+
+                if (attempt > 1) {
+                    helixLogger.info("Retry Succeeded", {
+                        retryAttempt: attempt,
+                    });
+                }
+
+                return result;
 
             } catch (error) {
 
@@ -27,6 +36,11 @@ export class RetryEngine {
 
                     MetricsManager.recordRetry();
 
+                    helixLogger.warn("Retry Attempt", {
+                        retryAttempt: attempt,
+                        retryDelay: currentDelay,
+                    });
+
                     await new Promise(resolve =>
                         setTimeout(resolve, currentDelay)
                     );
@@ -34,6 +48,16 @@ export class RetryEngine {
                     currentDelay = Math.min(
                         currentDelay * RetryConfig.backoffMultiplier,
                         RetryConfig.maxDelayMs
+                    );
+
+                } else {
+
+                    helixLogger.error(
+                        "Retry Failed",
+                        error,
+                        {
+                            retryAttempt: attempt,
+                        }
                     );
 
                 }

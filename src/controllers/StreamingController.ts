@@ -1,5 +1,7 @@
 import { Request, Response } from "express";
-import { providerManager } from "../providers/ProviderManager";
+import { ProviderManager } from "../providers/ProviderManager";
+
+const providerManager = new ProviderManager();
 import { SmartRouter } from "../orchestrator/SmartRouter";
 import { TaskType } from "../types/TaskType";
 

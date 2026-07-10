@@ -26,16 +26,12 @@ export class SmartRouter {
     /**
      * Selects the provider for a request.
      */
-    private selectProvider(
-        request: RoutingRequest
-    ) {
+    private selectProvider(request: RoutingRequest): string {
         if (!RouterConfig.enableSmartRouting) {
             return RouterConfig.defaultProvider;
         }
 
-        return RoutingRules.selectProvider(
-            request.taskType
-        );
+        return RoutingRules.selectProvider(request.taskType);
     }
 
     /**
@@ -44,15 +40,12 @@ export class SmartRouter {
     async route(
         request: RoutingRequest
     ): Promise<RoutingResponse> {
+        const providerName = this.selectProvider(request);
 
-        const providerName =
-            this.selectProvider(request);
-
-        const response =
-            await this.providerManager.executeChat(
-                providerName,
-                this.buildMessages(request)
-            );
+        const response = await this.providerManager.executeChat(
+            providerName,
+            this.buildMessages(request)
+        );
 
         return {
             content: response.content,
@@ -67,15 +60,12 @@ export class SmartRouter {
     async *routeStream(
         request: RoutingRequest
     ): AsyncGenerator<string> {
+        const providerName = this.selectProvider(request);
 
-        const providerName =
-            this.selectProvider(request);
-
-        const stream =
-            this.providerManager.executeChatStream(
-                providerName,
-                this.buildMessages(request)
-            );
+        const stream = this.providerManager.executeChatStream(
+            providerName,
+            this.buildMessages(request)
+        );
 
         for await (const chunk of stream) {
             yield chunk;
