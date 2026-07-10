@@ -41,6 +41,7 @@ export class ProviderManager {
     ): Promise<ChatResponse> {
         const provider = this.getProvider(providerName);
         const startTime = Date.now();
+        MetricsManager.recordRequest();
 
         try {
             const response = await RetryEngine.execute(() =>
@@ -49,7 +50,10 @@ export class ProviderManager {
 
             const latency = Date.now() - startTime;
 
-            HealthMonitor.recordSuccess(providerName as ProviderType);
+            HealthMonitor.recordSuccess(
+                providerName as ProviderType
+            );
+
             MetricsManager.recordSuccess(
                 providerName as ProviderType,
                 latency
@@ -59,7 +63,10 @@ export class ProviderManager {
         } catch (error) {
             const latency = Date.now() - startTime;
 
-            HealthMonitor.recordFailure(providerName as ProviderType);
+            HealthMonitor.recordFailure(
+                providerName as ProviderType
+            );
+
             MetricsManager.recordFailure(
                 providerName as ProviderType,
                 latency
@@ -73,11 +80,16 @@ export class ProviderManager {
         providerName: string,
         messages: ChatMessage[]
     ): Promise<ChatResponse> {
-       
+
+        MetricsManager.recordRequest();
 
         try {
-            return await this.executeWithMetrics(providerName, messages);
+            return await this.executeWithMetrics(
+                providerName,
+                messages
+            );
         } catch (error) {
+
             const nextProvider = FailoverEngine.getNextProvider(
                 PROVIDERS,
                 providerName
@@ -93,6 +105,52 @@ export class ProviderManager {
                 nextProvider.provider,
                 messages
             );
+        }
+    }
+
+    async *executeChatStream(
+        providerName: string,
+        messages: ChatMessage[]
+    ): AsyncGenerator<string> {
+
+        const provider = this.getProvider(providerName);
+
+        MetricsManager.recordRequest();
+
+        const startTime = Date.now();
+        MetricsManager.recordRequest();
+
+        try {
+
+            for await (const chunk of provider.chatStream(messages)) {
+                yield chunk;
+            }
+
+            const latency = Date.now() - startTime;
+
+            HealthMonitor.recordSuccess(
+                providerName as ProviderType
+            );
+
+            MetricsManager.recordSuccess(
+                providerName as ProviderType,
+                latency
+            );
+
+        } catch (error) {
+
+            const latency = Date.now() - startTime;
+
+            HealthMonitor.recordFailure(
+                providerName as ProviderType
+            );
+
+            MetricsManager.recordFailure(
+                providerName as ProviderType,
+                latency
+            );
+
+            throw error;
         }
     }
 }

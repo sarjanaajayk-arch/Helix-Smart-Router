@@ -4,7 +4,7 @@ import { MetricsController } from "../controllers/MetricsController";
 const router = Router();
 
 router.get(
-    "/metrics",
+    "/",
     MetricsController.getMetrics
 );
 
