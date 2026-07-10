@@ -1,6 +1,7 @@
 import { ProviderManager } from "../providers/ProviderManager";
 import { RoutingRequest } from "../models/RoutingRequest";
 import { RoutingResponse } from "../models/RoutingResponse";
+import { RoutingRules } from "./RoutingRules";
 
 export class SmartRouter {
     constructor(
@@ -10,8 +11,12 @@ export class SmartRouter {
     async route(
         request: RoutingRequest
     ): Promise<RoutingResponse> {
+const providerName = RoutingRules.selectProvider(request.taskType);
 
-        const provider = this.providerManager.getProvider("gemini");
+const modelName = RoutingRules.selectModel(request.taskType);
+
+const provider = this.providerManager.getProvider(providerName);
+      
 
         const response = await provider.chat([
             {
