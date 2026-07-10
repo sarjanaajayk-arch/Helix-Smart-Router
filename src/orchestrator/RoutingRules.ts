@@ -12,7 +12,10 @@ export class RoutingRules {
         // Future:
         // Filter providers based on task capabilities.
 
-        const provider = ProviderSelector.select(PROVIDERS);
+       const provider = ProviderSelector.select(
+    PROVIDERS,
+    taskType
+);
 
         return provider.provider;
     }

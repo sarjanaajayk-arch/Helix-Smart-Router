@@ -1,18 +1,25 @@
 import { ProviderCapabilities } from "../models/ProviderCapabilities";
+import { TaskType } from "../types/TaskType";
+import { CapabilityFilter } from "./CapabilityFilter";
 
 export class ProviderSelector {
+
     public static select(
-        providers: ProviderCapabilities[]
+        providers: ProviderCapabilities[],
+        taskType: TaskType
     ): ProviderCapabilities {
-        const availableProviders = providers.filter(
-            (provider) => provider.enabled && provider.healthy
+
+        const availableProviders = CapabilityFilter.filter(
+            providers,
+            taskType
         );
 
         if (availableProviders.length === 0) {
-            throw new Error("No healthy AI providers available.");
+            throw new Error("No compatible AI providers available.");
         }
 
         availableProviders.sort((a, b) => {
+
             // Higher priority wins
             if (a.priority !== b.priority) {
                 return a.priority - b.priority;
@@ -23,13 +30,15 @@ export class ProviderSelector {
                 return a.estimatedLatency - b.estimatedLatency;
             }
 
-            // Lower input cost wins
+            // Lower cost wins
             return (
                 a.costPerMillionInputTokens -
                 b.costPerMillionInputTokens
             );
+
         });
 
         return availableProviders[0];
     }
+
 }
