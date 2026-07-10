@@ -13,14 +13,15 @@ export class SmartRouter {
     ): Promise<RoutingResponse> {
         const providerName = RoutingRules.selectProvider(request.taskType);
 
-        const provider = this.providerManager.getProvider(providerName);
-
-        const response = await provider.chat([
-            {
-                role: "user",
-                content: request.prompt,
-            },
-        ]);
+       const response = await this.providerManager.executeChat(
+    providerName,
+    [
+        {
+            role: "user",
+            content: request.prompt,
+        },
+    ]
+);
 
         return {
             content: response.content,
