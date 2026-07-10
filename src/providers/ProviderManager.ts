@@ -1,17 +1,37 @@
 import { AIProvider, ChatMessage, ChatResponse } from "./AIProvider";
 import { GeminiProvider } from "./GeminiProvider";
+import { OpenRouterProvider } from "./OpenRouterProvider";
+
 import { RetryEngine } from "../orchestrator/RetryEngine";
-import { PROVIDERS } from "../orchestrator/ProviderRegistry";
 import { FailoverEngine } from "../orchestrator/FailoverEngine";
+import { HealthMonitor } from "../orchestrator/HealthMonitor";
+import { PROVIDERS } from "../orchestrator/ProviderRegistry";
+
+import { ProviderType } from "../types/ProviderType";
 
 export class ProviderManager {
 
     private providers: Map<string, AIProvider>;
 
     constructor() {
+
         this.providers = new Map();
 
-        this.providers.set("gemini", new GeminiProvider());
+        this.providers.set(
+            "gemini",
+            new GeminiProvider()
+        );
+
+        this.providers.set(
+            "openrouter",
+            new OpenRouterProvider()
+        );
+
+        HealthMonitor.initialize([
+            ProviderType.GEMINI,
+            ProviderType.OPENROUTER,
+        ]);
+
     }
 
     getProvider(name: string): AIProvider {
@@ -23,6 +43,7 @@ export class ProviderManager {
         }
 
         return provider;
+
     }
 
     async executeChat(
@@ -34,11 +55,21 @@ export class ProviderManager {
 
         try {
 
-            return await RetryEngine.execute(() =>
+            const response = await RetryEngine.execute(() =>
                 provider.chat(messages)
             );
 
+            HealthMonitor.recordSuccess(
+                providerName as ProviderType
+            );
+
+            return response;
+
         } catch (error) {
+
+            HealthMonitor.recordFailure(
+                providerName as ProviderType
+            );
 
             const nextProvider = FailoverEngine.getNextProvider(
                 PROVIDERS,
@@ -49,15 +80,18 @@ export class ProviderManager {
                 throw error;
             }
 
-            const fallback = this.getProvider(nextProvider.provider);
+            const fallback = this.getProvider(
+                nextProvider.provider
+            );
 
             return RetryEngine.execute(() =>
                 fallback.chat(messages)
             );
 
         }
+
     }
 
-} // ✅ This brace closes the ProviderManager class
+}
 
 export const providerManager = new ProviderManager();
