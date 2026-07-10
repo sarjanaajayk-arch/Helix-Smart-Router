@@ -6,6 +6,7 @@ import { RoutingRules } from "./RoutingRules";
 import { ModelSelector } from "./ModelSelector";
 
 export class SmartRouter {
+
     constructor(
         private readonly providerManager: ProviderManager
     ) {}
@@ -16,6 +17,7 @@ export class SmartRouter {
     private buildMessages(
         request: RoutingRequest
     ): { role: "user"; content: string }[] {
+
         return [
             {
                 role: "user",
@@ -25,11 +27,23 @@ export class SmartRouter {
     }
 
     /**
+     * Estimates the number of tokens in a prompt.
+     * Approximation: 1 token ≈ 4 characters.
+     */
+    private estimateTokens(
+        text: string
+    ): number {
+
+        return Math.ceil(text.length / 4);
+    }
+
+    /**
      * Selects the provider for a request.
      */
     private selectProvider(
         request: RoutingRequest
     ): string {
+
         if (!RouterConfig.enableSmartRouting) {
             return RouterConfig.defaultProvider;
         }
@@ -47,10 +61,14 @@ export class SmartRouter {
         const providerName =
             this.selectProvider(request);
 
+        const estimatedTokens =
+            this.estimateTokens(request.prompt);
+
         const model =
             ModelSelector.select(
                 providerName,
-                request.taskType
+                request.taskType,
+                estimatedTokens
             );
 
         const response =
@@ -77,10 +95,14 @@ export class SmartRouter {
         const providerName =
             this.selectProvider(request);
 
+        const estimatedTokens =
+            this.estimateTokens(request.prompt);
+
         const model =
             ModelSelector.select(
                 providerName,
-                request.taskType
+                request.taskType,
+                estimatedTokens
             );
 
         const stream =

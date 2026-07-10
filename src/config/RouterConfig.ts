@@ -17,10 +17,11 @@ export const RouterConfig = {
     enableHealthChecks: true,
 
     routingWeights: {
-    priority: 100,
-    capability: 30,
-    health: 20,
-    latency: 15,
-    reasoning: 25,
-    cost: 20,
-} satisfies RoutingWeights,
+        priority: 100,
+        capability: 30,
+        health: 20,
+        latency: 15,
+        reasoning: 25,
+        cost: 20,
+    } satisfies RoutingWeights,
+} as const;

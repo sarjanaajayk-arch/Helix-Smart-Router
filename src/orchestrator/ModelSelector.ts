@@ -5,36 +5,45 @@ import { ModelScorer } from "./ModelScorer";
 
 export class ModelSelector {
 
-    static select(
+    public static select(
         provider: string,
-        task: TaskType
+        task: TaskType,
+        estimatedTokens: number
     ): string {
 
-        const models =
-            ModelRegistryService
-                .getEnabledModels()
-                .filter(model =>
-                    model.provider.toLowerCase() === provider.toLowerCase()
-                );
+        const models = ModelRegistryService
+            .getEnabledModels()
+            .filter(model =>
+                model.provider.toLowerCase() === provider.toLowerCase()
+            );
 
         if (models.length === 0) {
             return "";
         }
 
-        const candidates =
-            models.filter(model =>
-                this.matchesTask(model, task)
+        // Keep only models that support the task
+        // and have enough context window.
+        const candidates = models.filter(model =>
+            this.matchesTask(model, task) &&
+            model.contextWindow >= estimatedTokens
+        );
+
+        // If no model can fit the request,
+        // return the model with the largest context window.
+        if (candidates.length === 0) {
+
+            const fallback = [...models].sort(
+                (a, b) => b.contextWindow - a.contextWindow
             );
 
-        if (candidates.length === 0) {
-            return models[0].id;
+            return fallback[0].id;
         }
 
+        // Score eligible models.
         candidates.sort(
-    (a, b) =>
-        ModelScorer.score(b) -
-        ModelScorer.score(a)
-);
+            (a, b) => ModelScorer.score(b) - ModelScorer.score(a)
+        );
+
         return candidates[0].id;
     }
 
@@ -60,7 +69,5 @@ export class ModelSelector {
             default:
                 return true;
         }
-
     }
-
 }

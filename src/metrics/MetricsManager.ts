@@ -4,6 +4,8 @@ interface ProviderMetrics {
     usage: number;
     successes: number;
     failures: number;
+    totalLatency: number;
+    averageLatency: number;
 }
 
 interface MetricsSnapshot {
@@ -18,6 +20,7 @@ interface MetricsSnapshot {
 }
 
 export class MetricsManager {
+
     private static totalRequests = 0;
     private static successfulRequests = 0;
     private static failedRequests = 0;
@@ -28,16 +31,21 @@ export class MetricsManager {
     private static totalLatency = 0;
 
     private static providerMetrics: Record<ProviderType, ProviderMetrics> = {
+
         [ProviderType.GEMINI]: {
             usage: 0,
             successes: 0,
             failures: 0,
+            totalLatency: 0,
+            averageLatency: 0,
         },
 
         [ProviderType.OPENROUTER]: {
             usage: 0,
             successes: 0,
             failures: 0,
+            totalLatency: 0,
+            averageLatency: 0,
         },
     };
 
@@ -49,22 +57,34 @@ export class MetricsManager {
         provider: ProviderType,
         latency: number
     ): void {
+
         this.successfulRequests++;
         this.totalLatency += latency;
 
-        this.providerMetrics[provider].usage++;
-        this.providerMetrics[provider].successes++;
+        const metrics = this.providerMetrics[provider];
+
+        metrics.usage++;
+        metrics.successes++;
+        metrics.totalLatency += latency;
+        metrics.averageLatency =
+            metrics.totalLatency / metrics.usage;
     }
 
     static recordFailure(
         provider: ProviderType,
         latency: number
     ): void {
+
         this.failedRequests++;
         this.totalLatency += latency;
 
-        this.providerMetrics[provider].usage++;
-        this.providerMetrics[provider].failures++;
+        const metrics = this.providerMetrics[provider];
+
+        metrics.usage++;
+        metrics.failures++;
+        metrics.totalLatency += latency;
+        metrics.averageLatency =
+            metrics.totalLatency / metrics.usage;
     }
 
     static recordRetry(): void {
@@ -75,11 +95,23 @@ export class MetricsManager {
         this.failoverCount++;
     }
 
+    static getProviderMetrics(
+        provider: ProviderType
+    ): ProviderMetrics {
+
+        return structuredClone(
+            this.providerMetrics[provider]
+        );
+    }
+
     static getMetrics(): MetricsSnapshot {
+
         const completed =
-            this.successfulRequests + this.failedRequests;
+            this.successfulRequests +
+            this.failedRequests;
 
         return {
+
             totalRequests: this.totalRequests,
 
             successfulRequests: this.successfulRequests,
@@ -97,11 +129,13 @@ export class MetricsManager {
                     ? 0
                     : this.totalLatency / completed,
 
-            providerMetrics: structuredClone(this.providerMetrics),
+            providerMetrics:
+                structuredClone(this.providerMetrics),
         };
     }
 
     static reset(): void {
+
         this.totalRequests = 0;
         this.successfulRequests = 0;
         this.failedRequests = 0;
@@ -112,16 +146,21 @@ export class MetricsManager {
         this.totalLatency = 0;
 
         this.providerMetrics = {
+
             [ProviderType.GEMINI]: {
                 usage: 0,
                 successes: 0,
                 failures: 0,
+                totalLatency: 0,
+                averageLatency: 0,
             },
 
             [ProviderType.OPENROUTER]: {
                 usage: 0,
                 successes: 0,
                 failures: 0,
+                totalLatency: 0,
+                averageLatency: 0,
             },
         };
     }
