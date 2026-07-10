@@ -1,4 +1,5 @@
 import { RouterConfig } from "../config/RouterConfig";
+import { RoutingContext } from "../models/RoutingContext";
 import { RoutingRequest } from "../models/RoutingRequest";
 import { RoutingResponse } from "../models/RoutingResponse";
 import { ProviderManager } from "../providers/ProviderManager";
@@ -58,24 +59,33 @@ export class SmartRouter {
         request: RoutingRequest
     ): Promise<RoutingResponse> {
 
-        const providerName =
+        // Create routing context
+        const context: RoutingContext = {
+            request,
+        };
+
+        // Select provider
+        context.provider =
             this.selectProvider(request);
 
-        const estimatedTokens =
+        // Estimate prompt tokens
+        context.estimatedTokens =
             this.estimateTokens(request.prompt);
 
-        const model =
+        // Select model
+        context.selectedModel =
             ModelSelector.select(
-                providerName,
+                context.provider,
                 request.taskType,
-                estimatedTokens
+                context.estimatedTokens
             );
 
+        // Execute request
         const response =
             await this.providerManager.executeChat(
-                providerName,
+                context.provider!,
                 this.buildMessages(request),
-                model
+                context.selectedModel!
             );
 
         return {
@@ -92,24 +102,33 @@ export class SmartRouter {
         request: RoutingRequest
     ): AsyncGenerator<string> {
 
-        const providerName =
+        // Create routing context
+        const context: RoutingContext = {
+            request,
+        };
+
+        // Select provider
+        context.provider =
             this.selectProvider(request);
 
-        const estimatedTokens =
+        // Estimate prompt tokens
+        context.estimatedTokens =
             this.estimateTokens(request.prompt);
 
-        const model =
+        // Select model
+        context.selectedModel =
             ModelSelector.select(
-                providerName,
+                context.provider,
                 request.taskType,
-                estimatedTokens
+                context.estimatedTokens
             );
 
+        // Execute streaming request
         const stream =
             this.providerManager.executeChatStream(
-                providerName,
+                context.provider!,
                 this.buildMessages(request),
-                model
+                context.selectedModel!
             );
 
         for await (const chunk of stream) {
