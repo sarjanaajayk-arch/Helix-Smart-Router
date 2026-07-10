@@ -1,8 +1,9 @@
 import { TaskType } from "../types/TaskType";
+import { ProviderType } from "../types/ProviderType";
 
 export class RoutingRules {
 
-    private static readonly DEFAULT_PROVIDER = "gemini";
+    private static readonly DEFAULT_PROVIDER = ProviderType.GEMINI;
 
     private static readonly DEFAULT_MODEL = "gemini-2.5-flash";
 

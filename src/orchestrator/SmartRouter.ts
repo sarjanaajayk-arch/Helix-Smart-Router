@@ -11,12 +11,9 @@ export class SmartRouter {
     async route(
         request: RoutingRequest
     ): Promise<RoutingResponse> {
-const providerName = RoutingRules.selectProvider(request.taskType);
+        const providerName = RoutingRules.selectProvider(request.taskType);
 
-const modelName = RoutingRules.selectModel(request.taskType);
-
-const provider = this.providerManager.getProvider(providerName);
-      
+        const provider = this.providerManager.getProvider(providerName);
 
         const response = await provider.chat([
             {
