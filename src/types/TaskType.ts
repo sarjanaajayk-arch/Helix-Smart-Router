@@ -1,0 +1,21 @@
+export enum TaskType {
+    GENERAL = "GENERAL",
+
+    CHAT = "CHAT",
+
+    CODE = "CODE",
+
+    REASONING = "REASONING",
+
+    SUMMARIZATION = "SUMMARIZATION",
+
+    TRANSLATION = "TRANSLATION",
+
+    CLASSIFICATION = "CLASSIFICATION",
+
+    SEARCH = "SEARCH",
+
+    VISION = "VISION",
+
+    AGENT = "AGENT",
+}
