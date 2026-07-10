@@ -22,7 +22,7 @@ export class ProviderScorer {
         // Lower cost is better
         score +=
             (Math.max(0, 100 - provider.costPerMillionInputTokens) / 100)
-            * weights.capability;
+            * weights.cost;
 
         // Larger context window is better
         score +=
