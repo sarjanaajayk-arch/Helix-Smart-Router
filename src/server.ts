@@ -4,6 +4,7 @@ import { logger } from "./config/logger";
 import cors from "cors";
 import { SmartRouter } from "./orchestrator/SmartRouter";
 import { TaskType } from "./types/TaskType";
+import metricsRoutes from "./routes/metricsRoutes";
 
 import { env } from "./config/env";
 
@@ -12,6 +13,7 @@ const smartRouter = new SmartRouter(providerManager);
 
 app.use(cors());
 app.use(express.json());
+app.use(metricsRoutes);
 
 app.get("/", (_, res) => {
   res.json({

@@ -73,7 +73,7 @@ export class ProviderManager {
         providerName: string,
         messages: ChatMessage[]
     ): Promise<ChatResponse> {
-        MetricsManager.recordRequest();
+       
 
         try {
             return await this.executeWithMetrics(providerName, messages);
