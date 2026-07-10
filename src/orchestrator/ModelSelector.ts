@@ -2,13 +2,15 @@ import { AIModel } from "../models/AIModel";
 import { ModelRegistryService } from "../registry/ModelRegistryService";
 import { TaskType } from "../types/TaskType";
 import { ModelScorer } from "./ModelScorer";
+import { RoutingPolicy } from "../types/RoutingPolicy";
 
 export class ModelSelector {
 
     public static select(
         provider: string,
         task: TaskType,
-        estimatedTokens: number
+        estimatedTokens: number,
+        policy: RoutingPolicy = RoutingPolicy.BALANCED
     ): string {
 
         const models = ModelRegistryService
@@ -21,15 +23,11 @@ export class ModelSelector {
             return "";
         }
 
-        // Keep only models that support the task
-        // and have enough context window.
         const candidates = models.filter(model =>
             this.matchesTask(model, task) &&
             model.contextWindow >= estimatedTokens
         );
 
-        // If no model can fit the request,
-        // return the model with the largest context window.
         if (candidates.length === 0) {
 
             const fallback = [...models].sort(
@@ -39,9 +37,10 @@ export class ModelSelector {
             return fallback[0].id;
         }
 
-        // Score eligible models.
         candidates.sort(
-            (a, b) => ModelScorer.score(b) - ModelScorer.score(a)
+            (a, b) =>
+                ModelScorer.score(b, policy) -
+                ModelScorer.score(a, policy)
         );
 
         return candidates[0].id;
@@ -58,7 +57,7 @@ export class ModelSelector {
                 return model.capabilities.supportsChat;
 
             case TaskType.CODE:
-                return model.capabilities.supportsReasoning;
+                return model.capabilities.supportsCoding;
 
             case TaskType.REASONING:
                 return model.capabilities.supportsReasoning;
@@ -70,4 +69,5 @@ export class ModelSelector {
                 return true;
         }
     }
+
 }

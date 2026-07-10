@@ -1,15 +1,13 @@
 export enum RoutingPolicy {
+
     BALANCED = "balanced",
 
-    QUALITY = "quality",
+    CHEAPEST = "cheapest",
 
-    LOW_COST = "low-cost",
+    FASTEST = "fastest",
 
-    LOW_LATENCY = "low-latency",
+    HIGHEST_QUALITY = "highest_quality",
 
-    REASONING = "reasoning",
+    LONG_CONTEXT = "long_context",
 
-    VISION = "vision",
-
-    CODING = "coding",
 }

@@ -14,6 +14,11 @@ router.get(
 );
 
 router.get(
+    "/models",
+    DashboardController.getModels
+);
+
+router.get(
     "/health",
     DashboardController.getHealth
 );

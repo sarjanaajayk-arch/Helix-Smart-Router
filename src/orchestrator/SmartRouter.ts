@@ -1,3 +1,4 @@
+import { TaskType } from "../types/TaskType";
 import { RouterConfig } from "../config/RouterConfig";
 import { RoutingContext } from "../models/RoutingContext";
 import { RoutingRequest } from "../models/RoutingRequest";
@@ -5,6 +6,7 @@ import { RoutingResponse } from "../models/RoutingResponse";
 import { ProviderManager } from "../providers/ProviderManager";
 import { RoutingRules } from "./RoutingRules";
 import { ModelSelector } from "./ModelSelector";
+import { RoutingPolicy } from "../types/RoutingPolicy";
 
 export class SmartRouter {
 
@@ -53,34 +55,75 @@ export class SmartRouter {
     }
 
     /**
+     * Selects the routing policy for a request.
+     * Kept conservative for now to preserve existing behavior.
+     */
+    private selectPolicy(
+    request: RoutingRequest
+): RoutingPolicy {
+
+    switch (request.taskType) {
+
+        case TaskType.CODE:
+            return RoutingPolicy.HIGHEST_QUALITY;
+
+        case TaskType.REASONING:
+            return RoutingPolicy.HIGHEST_QUALITY;
+
+        case TaskType.VISION:
+            return RoutingPolicy.BALANCED;
+
+        case TaskType.SUMMARIZATION:
+            return RoutingPolicy.CHEAPEST;
+
+        case TaskType.TRANSLATION:
+            return RoutingPolicy.CHEAPEST;
+
+        case TaskType.CLASSIFICATION:
+            return RoutingPolicy.CHEAPEST;
+
+        case TaskType.SEARCH:
+            return RoutingPolicy.FASTEST;
+
+        case TaskType.AGENT:
+            return RoutingPolicy.BALANCED;
+
+        case TaskType.GENERAL:
+            return RoutingPolicy.BALANCED;
+
+        case TaskType.CHAT:
+        default:
+            return RoutingPolicy.BALANCED;
+    }
+}
+
+    /**
      * Routes a normal request.
      */
     async route(
         request: RoutingRequest
     ): Promise<RoutingResponse> {
 
-        // Create routing context
         const context: RoutingContext = {
             request,
         };
 
-        // Select provider
         context.provider =
             this.selectProvider(request);
 
-        // Estimate prompt tokens
         context.estimatedTokens =
             this.estimateTokens(request.prompt);
 
-        // Select model
+        const policy = this.selectPolicy(request);
+
         context.selectedModel =
             ModelSelector.select(
                 context.provider,
                 request.taskType,
-                context.estimatedTokens
+                context.estimatedTokens,
+                policy
             );
 
-        // Execute request
         const response =
             await this.providerManager.executeChat(
                 context.provider!,
@@ -102,28 +145,26 @@ export class SmartRouter {
         request: RoutingRequest
     ): AsyncGenerator<string> {
 
-        // Create routing context
         const context: RoutingContext = {
             request,
         };
 
-        // Select provider
         context.provider =
             this.selectProvider(request);
 
-        // Estimate prompt tokens
         context.estimatedTokens =
             this.estimateTokens(request.prompt);
 
-        // Select model
+        const policy = this.selectPolicy(request);
+
         context.selectedModel =
             ModelSelector.select(
                 context.provider,
                 request.taskType,
-                context.estimatedTokens
+                context.estimatedTokens,
+                policy
             );
 
-        // Execute streaming request
         const stream =
             this.providerManager.executeChatStream(
                 context.provider!,
