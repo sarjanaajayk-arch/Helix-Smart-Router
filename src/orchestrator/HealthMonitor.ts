@@ -1,3 +1,5 @@
+import { RetryConfig } from "../config/RetryConfig";
+import { TimeoutConfig } from "../config/TimeoutConfig";
 import { ProviderType } from "../types/ProviderType";
 
 type HealthStatus = {
@@ -8,15 +10,20 @@ type HealthStatus = {
 
 export class HealthMonitor {
 
-    private static readonly MAX_FAILURES = 3;
+    private static readonly MAX_FAILURES =
+        RetryConfig.maxRetries;
 
-    private static readonly COOLDOWN_MS = 60 * 1000;
+    private static readonly COOLDOWN_MS =
+        TimeoutConfig.requestTimeoutMs;
 
-    private static readonly health = new Map<ProviderType, HealthStatus>();
+    private static readonly health =
+        new Map<ProviderType, HealthStatus>();
 
-    static initialize(providers: ProviderType[]) {
+    static initialize(
+        providers: ProviderType[]
+    ): void {
 
-        providers.forEach(provider => {
+        providers.forEach((provider) => {
 
             this.health.set(provider, {
                 healthy: true,
@@ -27,7 +34,9 @@ export class HealthMonitor {
 
     }
 
-    static recordSuccess(provider: ProviderType) {
+    static recordSuccess(
+        provider: ProviderType
+    ): void {
 
         this.health.set(provider, {
             healthy: true,
@@ -36,7 +45,9 @@ export class HealthMonitor {
 
     }
 
-    static recordFailure(provider: ProviderType) {
+    static recordFailure(
+        provider: ProviderType
+    ): void {
 
         const current = this.health.get(provider);
 
@@ -48,13 +59,18 @@ export class HealthMonitor {
 
         current.lastFailure = new Date();
 
-        if (current.failureCount >= this.MAX_FAILURES) {
+        if (
+            current.failureCount >=
+            this.MAX_FAILURES
+        ) {
             current.healthy = false;
         }
 
     }
 
-    static isHealthy(provider: ProviderType): boolean {
+    static isHealthy(
+        provider: ProviderType
+    ): boolean {
 
         const current = this.health.get(provider);
 
@@ -71,12 +87,12 @@ export class HealthMonitor {
         }
 
         const elapsed =
-            Date.now() - current.lastFailure.getTime();
+            Date.now() -
+            current.lastFailure.getTime();
 
         if (elapsed >= this.COOLDOWN_MS) {
 
             current.healthy = true;
-
             current.failureCount = 0;
 
             return true;
@@ -84,7 +100,5 @@ export class HealthMonitor {
         }
 
         return false;
-
     }
-
 }

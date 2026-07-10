@@ -1,3 +1,4 @@
+import { ProviderConfig } from "../config/ProviderConfig";
 import { ProviderCapabilities } from "../models/ProviderCapabilities";
 import { ProviderType } from "../types/ProviderType";
 
@@ -13,8 +14,8 @@ export const PROVIDERS: ProviderCapabilities[] = [
         supportsStreaming: true,
         supportsLongContext: true,
 
-        // Operational metadata
-        priority: 1,
+        // Configuration
+        priority: ProviderConfig[ProviderType.GEMINI].priority,
 
         estimatedLatency: 350,
 
@@ -26,7 +27,7 @@ export const PROVIDERS: ProviderCapabilities[] = [
 
         healthy: true,
 
-        enabled: true,
+        enabled: ProviderConfig[ProviderType.GEMINI].enabled,
     },
 
     {
@@ -40,8 +41,8 @@ export const PROVIDERS: ProviderCapabilities[] = [
         supportsStreaming: true,
         supportsLongContext: true,
 
-        // Operational metadata
-        priority: 2,
+        // Configuration
+        priority: ProviderConfig[ProviderType.OPENROUTER].priority,
 
         estimatedLatency: 500,
 
@@ -53,6 +54,6 @@ export const PROVIDERS: ProviderCapabilities[] = [
 
         healthy: true,
 
-        enabled: true,
+        enabled: ProviderConfig[ProviderType.OPENROUTER].enabled,
     },
 ];
