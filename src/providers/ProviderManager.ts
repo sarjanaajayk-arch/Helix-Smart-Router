@@ -1,6 +1,8 @@
 import { AIProvider, ChatMessage, ChatResponse } from "./AIProvider";
 import { GeminiProvider } from "./GeminiProvider";
 import { RetryEngine } from "../orchestrator/RetryEngine";
+import { PROVIDERS } from "../orchestrator/ProviderRegistry";
+import { FailoverEngine } from "../orchestrator/FailoverEngine";
 
 export class ProviderManager {
 
@@ -30,12 +32,32 @@ export class ProviderManager {
 
         const provider = this.getProvider(providerName);
 
-        return RetryEngine.execute(() =>
-            provider.chat(messages)
-        );
+        try {
 
+            return await RetryEngine.execute(() =>
+                provider.chat(messages)
+            );
+
+        } catch (error) {
+
+            const nextProvider = FailoverEngine.getNextProvider(
+                PROVIDERS,
+                providerName
+            );
+
+            if (!nextProvider) {
+                throw error;
+            }
+
+            const fallback = this.getProvider(nextProvider.provider);
+
+            return RetryEngine.execute(() =>
+                fallback.chat(messages)
+            );
+
+        }
     }
 
-}
+} // ✅ This brace closes the ProviderManager class
 
 export const providerManager = new ProviderManager();
