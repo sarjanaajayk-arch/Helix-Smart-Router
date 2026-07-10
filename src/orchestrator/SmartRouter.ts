@@ -3,6 +3,7 @@ import { RoutingRequest } from "../models/RoutingRequest";
 import { RoutingResponse } from "../models/RoutingResponse";
 import { ProviderManager } from "../providers/ProviderManager";
 import { RoutingRules } from "./RoutingRules";
+import { ModelSelector } from "./ModelSelector";
 
 export class SmartRouter {
     constructor(
@@ -26,7 +27,9 @@ export class SmartRouter {
     /**
      * Selects the provider for a request.
      */
-    private selectProvider(request: RoutingRequest): string {
+    private selectProvider(
+        request: RoutingRequest
+    ): string {
         if (!RouterConfig.enableSmartRouting) {
             return RouterConfig.defaultProvider;
         }
@@ -40,12 +43,22 @@ export class SmartRouter {
     async route(
         request: RoutingRequest
     ): Promise<RoutingResponse> {
-        const providerName = this.selectProvider(request);
 
-        const response = await this.providerManager.executeChat(
-            providerName,
-            this.buildMessages(request)
-        );
+        const providerName =
+            this.selectProvider(request);
+
+        const model =
+            ModelSelector.select(
+                providerName,
+                request.taskType
+            );
+
+        const response =
+            await this.providerManager.executeChat(
+                providerName,
+                this.buildMessages(request),
+                model
+            );
 
         return {
             content: response.content,
@@ -60,12 +73,22 @@ export class SmartRouter {
     async *routeStream(
         request: RoutingRequest
     ): AsyncGenerator<string> {
-        const providerName = this.selectProvider(request);
 
-        const stream = this.providerManager.executeChatStream(
-            providerName,
-            this.buildMessages(request)
-        );
+        const providerName =
+            this.selectProvider(request);
+
+        const model =
+            ModelSelector.select(
+                providerName,
+                request.taskType
+            );
+
+        const stream =
+            this.providerManager.executeChatStream(
+                providerName,
+                this.buildMessages(request),
+                model
+            );
 
         for await (const chunk of stream) {
             yield chunk;

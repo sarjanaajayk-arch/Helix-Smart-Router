@@ -1,4 +1,7 @@
+import { AIModel } from "../models/AIModel";
+import { ModelRegistryService } from "../registry/ModelRegistryService";
 import { TaskType } from "../types/TaskType";
+import { ModelScorer } from "./ModelScorer";
 
 export class ModelSelector {
 
@@ -7,41 +10,55 @@ export class ModelSelector {
         task: TaskType
     ): string {
 
-        switch (provider) {
+        const models =
+            ModelRegistryService
+                .getEnabledModels()
+                .filter(model =>
+                    model.provider.toLowerCase() === provider.toLowerCase()
+                );
 
-            case "gemini":
+        if (models.length === 0) {
+            return "";
+        }
 
-                switch (task) {
+        const candidates =
+            models.filter(model =>
+                this.matchesTask(model, task)
+            );
 
-                    case TaskType.CODE:
-                        return "gemini-2.5-pro";
+        if (candidates.length === 0) {
+            return models[0].id;
+        }
 
-                    case TaskType.VISION:
-                        return "gemini-2.5-pro";
+        candidates.sort(
+    (a, b) =>
+        ModelScorer.score(b) -
+        ModelScorer.score(a)
+);
+        return candidates[0].id;
+    }
 
-                    case TaskType.REASONING:
-                        return "gemini-2.5-pro";
+    private static matchesTask(
+        model: AIModel,
+        task: TaskType
+    ): boolean {
 
-                    default:
-                        return "gemini-2.5-flash";
-                }
+        switch (task) {
 
-            case "openrouter":
+            case TaskType.CHAT:
+                return model.capabilities.supportsChat;
 
-                switch (task) {
+            case TaskType.CODE:
+                return model.capabilities.supportsReasoning;
 
-                    case TaskType.CODE:
-                        return "anthropic/claude-sonnet-4";
+            case TaskType.REASONING:
+                return model.capabilities.supportsReasoning;
 
-                    case TaskType.REASONING:
-                        return "openai/gpt-4.1";
-
-                    default:
-                        return "openai/gpt-4.1-mini";
-                }
+            case TaskType.VISION:
+                return model.capabilities.supportsVision;
 
             default:
-                return "";
+                return true;
         }
 
     }

@@ -1,4 +1,5 @@
 import { ProviderType } from "../types/ProviderType";
+import { RoutingWeights } from "../models/RoutingWeights";
 
 export const RouterConfig = {
     defaultProvider: ProviderType.GEMINI,
@@ -14,4 +15,16 @@ export const RouterConfig = {
     enableRetry: true,
 
     enableHealthChecks: true,
+
+    routingWeights: {
+        priority: 100,
+
+        capability: 30,
+
+        health: 20,
+
+        latency: 15,
+
+        reasoning: 25,
+    } satisfies RoutingWeights,
 } as const;
