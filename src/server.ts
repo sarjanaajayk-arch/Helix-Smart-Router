@@ -2,10 +2,13 @@ import { providerManager } from "./providers/ProviderManager";
 import express from "express";
 import { logger } from "./config/logger";
 import cors from "cors";
+import { SmartRouter } from "./orchestrator/SmartRouter";
+import { TaskType } from "./types/TaskType";
 
 import { env } from "./config/env";
 
 const app = express();
+const smartRouter = new SmartRouter(providerManager);
 
 app.use(cors());
 app.use(express.json());
@@ -29,21 +32,17 @@ app.get("/health", (_, res) => {
 
 app.get("/api/test", async (_, res) => {
   try {
-    const provider = providerManager.getProvider("gemini");
-
-    const response = await provider.chat([
-      {
-        role: "user",
-        content: "Introduce yourself as Helix AI in one short paragraph.",
-      },
-    ]);
+    const response = await smartRouter.route({
+      prompt: "Introduce yourself as Helix AI in one short paragraph.",
+      taskType: TaskType.CHAT,
+    });
 
     res.json(response);
   } catch (error) {
     console.error(error);
 
     res.status(500).json({
-      error: "Failed to communicate with Gemini.",
+      error: "Failed to process AI request.",
     });
   }
 });
