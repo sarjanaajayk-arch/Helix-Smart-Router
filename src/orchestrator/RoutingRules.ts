@@ -1,27 +1,26 @@
+import { PROVIDERS } from "./ProviderRegistry";
+import { ProviderSelector } from "./ProviderSelector";
+
 import { TaskType } from "../types/TaskType";
-import { ProviderType } from "../types/ProviderType";
 
 export class RoutingRules {
-
-    private static readonly DEFAULT_PROVIDER = ProviderType.GEMINI;
 
     private static readonly DEFAULT_MODEL = "gemini-2.5-flash";
 
     static selectProvider(taskType: TaskType): string {
-        switch (taskType) {
-            case TaskType.CHAT:
-            case TaskType.CODE:
-            case TaskType.REASONING:
-            case TaskType.VISION:
-                return this.DEFAULT_PROVIDER;
 
-            default:
-                return this.DEFAULT_PROVIDER;
-        }
+        // Future:
+        // Filter providers based on task capabilities.
+
+        const provider = ProviderSelector.select(PROVIDERS);
+
+        return provider.provider;
     }
 
     static selectModel(taskType: TaskType): string {
+
         switch (taskType) {
+
             case TaskType.CHAT:
             case TaskType.CODE:
             case TaskType.REASONING:
