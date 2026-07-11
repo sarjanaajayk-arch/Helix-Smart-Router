@@ -74,11 +74,14 @@ app.get("/health", (_, res) => {
 app.get("/api/test", async (_, res) => {
     try {
         const response = await smartRouter.route({
-            prompt: "Introduce yourself as Helix AI in one short paragraph.",
+            prompt: `Write a production-ready TypeScript implementation of an LRU Cache.
+Explain the algorithm, time complexity, and include unit tests.`,
             taskType: TaskType.CHAT,
         });
 
+        // Return the complete routing response
         res.status(200).json(response);
+
     } catch (error) {
         helixLogger.error("Failed to process AI request", error);
 
@@ -87,7 +90,6 @@ app.get("/api/test", async (_, res) => {
         });
     }
 });
-
 /* --------------------------------- */
 /* Start Server */
 /* --------------------------------- */
