@@ -1,4 +1,5 @@
 import { ProviderCapabilities } from "../models/ProviderCapabilities";
+import { HealthMonitor } from "./HealthMonitor";
 
 export class FailoverEngine {
 
@@ -11,7 +12,7 @@ export class FailoverEngine {
             provider =>
                 provider.provider !== currentProvider &&
                 provider.enabled &&
-                provider.healthy
+                HealthMonitor.isHealthy(provider.provider)
         );
 
         if (candidates.length === 0) {

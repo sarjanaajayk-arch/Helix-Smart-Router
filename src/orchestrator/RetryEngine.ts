@@ -32,7 +32,9 @@ export class RetryEngine {
 
                 lastError = error;
 
-                if (attempt < retries) {
+                const isRetryable = RetryEngine.isRetryableError(error);
+
+                if (attempt < retries && isRetryable) {
 
                     MetricsManager.recordRetry();
 
@@ -68,6 +70,26 @@ export class RetryEngine {
 
         throw lastError;
 
+    }
+
+    private static isRetryableError(error: unknown): boolean {
+        // If error is an ApiError with a status code, check against retryable status codes
+        if (error && typeof error === 'object' && 'status' in error) {
+            const status = (error as any).status;
+            if (typeof status === 'number') {
+                return RetryConfig.retryableStatusCodes.includes(status);
+            }
+        }
+        // Also check for common error properties like 'code' or 'statusCode'
+        if (error && typeof error === 'object' && 'code' in error) {
+            const code = (error as any).code;
+            if (typeof code === 'number') {
+                return RetryConfig.retryableStatusCodes.includes(code);
+            }
+        }
+        // If no status/code, we assume it's not an HTTP error and retry (preserving existing behavior for unit tests)
+        // This ensures that errors thrown in unit tests (like string errors) are still retried.
+        return true;
     }
 
 }

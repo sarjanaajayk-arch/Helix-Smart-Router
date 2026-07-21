@@ -1,5 +1,6 @@
 import { ProviderCapabilities } from "../models/ProviderCapabilities";
 import { TaskType } from "../types/TaskType";
+import { HealthMonitor } from "./HealthMonitor";
 
 export class CapabilityFilter {
     public static filter(
@@ -9,7 +10,11 @@ export class CapabilityFilter {
 
         return providers.filter((provider) => {
 
-            if (!provider.enabled || !provider.healthy) {
+            if (!provider.enabled) {
+                return false;
+            }
+
+            if (!HealthMonitor.isHealthy(provider.provider)) {
                 return false;
             }
 
@@ -27,8 +32,23 @@ export class CapabilityFilter {
                 case TaskType.REASONING:
                     return provider.supportsReasoning;
 
+                case TaskType.SUMMARIZATION:
+                    return provider.supportsChat; // Summarization uses chat capability
+
+                case TaskType.TRANSLATION:
+                    return provider.supportsChat; // Translation uses chat capability
+
+                case TaskType.CLASSIFICATION:
+                    return provider.supportsChat; // Classification uses chat capability
+
+                case TaskType.SEARCH:
+                    return provider.supportsChat; // Search uses chat capability
+
+                case TaskType.AGENT:
+                    return provider.supportsChat; // Agent uses chat capability
+
                 default:
-                    return false;
+                    return provider.supportsChat; // Default to chat capability
             }
 
         });

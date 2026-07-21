@@ -7,6 +7,8 @@ import { ProviderManager } from "../providers/ProviderManager";
 import { RoutingRules } from "./RoutingRules";
 import { ModelSelector } from "./ModelSelector";
 import { RoutingPolicy } from "../types/RoutingPolicy";
+import { CircuitBreaker } from "./CircuitBreaker";
+import { ProviderType } from "../types/ProviderType";
 
 export class SmartRouter {
 
@@ -41,18 +43,37 @@ export class SmartRouter {
     }
 
     /**
-     * Selects the provider for a request.
-     */
-    private selectProvider(
-        request: RoutingRequest
-    ): string {
+         * Selects the provider for a request.
+         */
+        private selectProvider(
+            request: RoutingRequest
+        ): ProviderType {
 
-        if (!RouterConfig.enableSmartRouting) {
-            return RouterConfig.defaultProvider;
+            if (!RouterConfig.enableSmartRouting) {
+                const defaultProvider = RouterConfig.defaultProvider;
+                // Check circuit breaker for default provider
+                if (!CircuitBreaker.isAvailable(defaultProvider)) {
+                    throw new Error(`Circuit breaker open for provider: ${defaultProvider}`);
+                }
+                return defaultProvider;
+            }
+
+            const selectedProvider = RoutingRules.selectProvider(request.taskType) as ProviderType;
+
+            // Check circuit breaker for selected provider
+            if (!CircuitBreaker.isAvailable(selectedProvider)) {
+                // Try fallback providers
+                const providers = RoutingRules.getAllProviders() as ProviderType[];
+                for (const provider of providers) {
+                    if (provider !== selectedProvider && CircuitBreaker.isAvailable(provider)) {
+                        return provider;
+                    }
+                }
+                throw new Error(`Circuit breaker open for all available providers`);
+            }
+
+            return selectedProvider;
         }
-
-        return RoutingRules.selectProvider(request.taskType);
-    }
 
     /**
      * Selects the routing policy for a request.
@@ -139,41 +160,44 @@ export class SmartRouter {
     }
 
     /**
-     * Routes a streaming request.
-     */
-    async *routeStream(
-        request: RoutingRequest
-    ): AsyncGenerator<string> {
+         * Routes a streaming request.
+         */
+        async *routeStream(
+            request: RoutingRequest
+        ): AsyncGenerator<string> {
 
-        const context: RoutingContext = {
-            request,
-        };
+            const context: RoutingContext = {
+                request,
+            };
 
-        context.provider =
-            this.selectProvider(request);
+            context.provider =
+                this.selectProvider(request);
 
-        context.estimatedTokens =
-            this.estimateTokens(request.prompt);
+            context.estimatedTokens =
+                this.estimateTokens(request.prompt);
 
-        const policy = this.selectPolicy(request);
+            const policy = this.selectPolicy(request);
 
-        context.selectedModel =
-            ModelSelector.select(
-                context.provider,
-                request.taskType,
-                context.estimatedTokens,
-                policy
-            );
+            context.selectedModel =
+                ModelSelector.select(
+                    context.provider,
+                    request.taskType,
+                    context.estimatedTokens,
+                    policy
+                );
 
-        const stream =
-            this.providerManager.executeChatStream(
-                context.provider!,
-                this.buildMessages(request),
-                context.selectedModel!
-            );
+            const stream =
+                this.providerManager.executeChatStream(
+                    context.provider!,
+                    this.buildMessages(request),
+                    context.selectedModel!
+                );
 
-        for await (const chunk of stream) {
-            yield chunk;
+            console.log("[SmartRouter] Starting to iterate providerManager.executeChatStream");
+            for await (const chunk of stream) {
+                console.log("[SmartRouter] Received chunk from providerManager, length:", chunk.length);
+                yield chunk;
+            }
+            console.log("[SmartRouter] Stream iteration complete");
         }
-    }
 }

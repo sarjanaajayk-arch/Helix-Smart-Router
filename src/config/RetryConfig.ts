@@ -15,4 +15,4 @@ export const RetryConfig = {
         503,
         504,
     ],
-} as const;
+};

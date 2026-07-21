@@ -21,7 +21,7 @@ export class OpenAIRequestConverter {
             model: openaiRequest.model,
             temperature: openaiRequest.temperature,
             maxTokens: openaiRequest.max_tokens,
-            stream: false,
+            stream: openaiRequest.stream ?? false,
         };
 
         return routingRequest;

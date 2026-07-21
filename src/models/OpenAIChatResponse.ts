@@ -3,16 +3,19 @@ export interface OpenAIMessage {
     content: string;
 }
 
-export interface OpenAIChatRequest {
+export interface OpenAIChatResponse {
+    id: string;
+    object: "chat.completion";
+    created: number;
     model: string;
-    messages: OpenAIMessage[];
-
-    temperature?: number;
-    max_tokens?: number;
-    top_p?: number;
-
-    tools?: any[];
-    tool_choice?: any;
-
-    user?: string;
+    choices: Array<{
+        index: number;
+        message: OpenAIMessage;
+        finish_reason: "stop" | "length" | "tool_calls" | null;
+    }>;
+    usage: {
+        prompt_tokens: number;
+        completion_tokens: number;
+        total_tokens: number;
+    };
 }

@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 
 import { BaseProvider } from "./BaseProvider";
-import { ChatMessage, ChatResponse } from "./AIProvider";
+import { ChatMessage, ChatResponse, AIModelInfo } from "./AIProvider";
 import { env } from "../config/env";
 
 export class OpenRouterProvider extends BaseProvider {
@@ -21,41 +21,162 @@ export class OpenRouterProvider extends BaseProvider {
         });
     }
 
-    async chat(messages: ChatMessage[]): Promise<ChatResponse> {
-        this.log("Sending request to OpenRouter...");
+    async getAvailableModels(): Promise<AIModelInfo[]> {
+        try {
+            // Fetch models from OpenRouter API
+            const response = await this.client.models.list();
+            
+            // Map OpenRouter models to our AIModelInfo format
+            // We'll include some common models with known specs
+            const knownModels: Record<string, Partial<AIModelInfo>> = {
+                // OpenAI models
+                "openai/gpt-4o": { contextWindow: 128000, maxOutputTokens: 4096, inputPricePerMillionTokens: 5.0, outputPricePerMillionTokens: 15.0 },
+                "openai/gpt-4o-mini": { contextWindow: 128000, maxOutputTokens: 4096, inputPricePerMillionTokens: 0.15, outputPricePerMillionTokens: 0.6 },
+                "openai/gpt-4-turbo": { contextWindow: 128000, maxOutputTokens: 4096, inputPricePerMillionTokens: 10.0, outputPricePerMillionTokens: 30.0 },
+                "openai/gpt-3.5-turbo": { contextWindow: 16385, maxOutputTokens: 4096, inputPricePerMillionTokens: 0.5, outputPricePerMillionTokens: 1.5 },
+                
+                // Anthropic models
+                "anthropic/claude-3.5-sonnet": { contextWindow: 200000, maxOutputTokens: 4096, inputPricePerMillionTokens: 3.0, outputPricePerMillionTokens: 15.0 },
+                "anthropic/claude-3-opus": { contextWindow: 200000, maxOutputTokens: 4096, inputPricePerMillionTokens: 15.0, outputPricePerMillionTokens: 75.0 },
+                "anthropic/claude-3-haiku": { contextWindow: 200000, maxOutputTokens: 4096, inputPricePerMillionTokens: 0.25, outputPricePerMillionTokens: 1.25 },
+                
+                // Google models
+                "google/gemini-pro-1.5": { contextWindow: 32768, maxOutputTokens: 8192, inputPricePerMillionTokens: 0.35, outputPricePerMillionTokens: 1.05 },
+                "google/gemini-flash-1.5": { contextWindow: 32768, maxOutputTokens: 8192, inputPricePerMillionTokens: 0.07, outputPricePerMillionTokens: 0.30 },
+                
+                // Meta models
+                "meta-llama/llama-3-70b-instruct": { contextWindow: 8192, maxOutputTokens: 4096, inputPricePerMillionTokens: 0.42, outputPricePerMillionTokens: 0.57 },
+                "meta-llama/llama-3-8b-instruct": { contextWindow: 8192, maxOutputTokens: 4096, inputPricePerMillionTokens: 0.06, outputPricePerMillionTokens: 0.09 },
+                
+                // Mistral models
+                "mistralai/mistral-large": { contextWindow: 32768, maxOutputTokens: 4096, inputPricePerMillionTokens: 2.0, outputPricePerMillionTokens: 6.0 },
+                "mistralai/mistral-medium": { contextWindow: 32768, maxOutputTokens: 4096, inputPricePerMillionTokens: 0.45, outputPricePerMillionTokens: 1.35 },
+                "mistralai/mistral-small": { contextWindow: 32768, maxOutputTokens: 4096, inputPricePerMillionTokens: 0.06, outputPricePerMillionTokens: 0.18 },
+                
+                // Deepseek models
+                "deepseek/deepseek-chat": { contextWindow: 32768, maxOutputTokens: 4096, inputPricePerMillionTokens: 0.27, outputPricePerMillionTokens: 1.10 },
+                "deepseek/deepseek-coder": { contextWindow: 32768, maxOutputTokens: 4096, inputPricePerMillionTokens: 0.27, outputPricePerMillionTokens: 1.10 },
+            };
 
-        const response = await this.client.chat.completions.create({
-            model: this.model,
-            messages: messages.map((message) => ({
-                role: message.role as "user" | "assistant" | "system",
-                content: message.content,
-            })),
-        });
+            const models: AIModelInfo[] = response.data.map((model: any) => {
+                const modelId = model.id;
+                const knownSpecs = knownModels[modelId] || {};
+                
+                return {
+                    id: modelId,
+                    name: model.id.replace(/\//g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2'), // Convert "google/gemini-pro" to "google gemini pro"
+                    contextWindow: knownSpecs.contextWindow ?? 32768, // Default fallback
+                    maxOutputTokens: knownSpecs.maxOutputTokens ?? 4096, // Default fallback
+                    supportsChat: true,
+                    supportsVision: modelId.includes('vision') || modelId.includes('clip') || modelId.includes('visual'),
+                    supportsStreaming: true,
+                    supportsFunctionCalling: true, // Most models support this via tools
+                    supportsReasoning: modelId.includes('reasoning') || modelId.includes('o1') || modelId.includes('o3'),
+                    supportsCoding: modelId.includes('code') || modelId.includes('coder') || modelId.includes('programming'),
+                    inputPricePerMillionTokens: knownSpecs.inputPricePerMillionTokens,
+                    outputPricePerMillionTokens: knownSpecs.outputPricePerMillionTokens,
+                };
+            });
 
-        return {
-            content: response.choices[0]?.message?.content ?? "",
-            provider: this.name,
-            model: this.model,
-        };
+            return models;
+        } catch (error) {
+            console.error("Failed to fetch OpenRouter models:", error);
+            // Return some common models as fallback
+            return [
+                {
+                    id: "openai/gpt-4o",
+                    name: "OpenAI GPT-4o",
+                    contextWindow: 128000,
+                    maxOutputTokens: 4096,
+                    supportsChat: true,
+                    supportsVision: true,
+                    supportsStreaming: true,
+                    supportsFunctionCalling: true,
+                    supportsReasoning: false,
+                    supportsCoding: true,
+                    inputPricePerMillionTokens: 5.0,
+                    outputPricePerMillionTokens: 15.0,
+                },
+                {
+                    id: "anthropic/claude-3.5-sonnet",
+                    name: "Anthropic Claude 3.5 Sonnet",
+                    contextWindow: 200000,
+                    maxOutputTokens: 4096,
+                    supportsChat: true,
+                    supportsVision: true,
+                    supportsStreaming: true,
+                    supportsFunctionCalling: true,
+                    supportsReasoning: true,
+                    supportsCoding: true,
+                    inputPricePerMillionTokens: 3.0,
+                    outputPricePerMillionTokens: 15.0,
+                }
+            ];
+        }
     }
 
-    async *chatStream(messages: ChatMessage[]): AsyncGenerator<string> {
-        this.log("Streaming request to OpenRouter...");
+    async chat(messages: ChatMessage[]): Promise<ChatResponse> {
+            this.log("Sending request to OpenRouter...");
 
-        const stream = await this.client.chat.completions.create({
-            model: this.model,
-            messages: messages.map((message) => ({
-                role: message.role as "user" | "assistant" | "system",
-                content: message.content,
-            })),
-            stream: true,
-        });
+            const openaiMessages = messages.map((message) => {
+                let role = message.role;
+                let content = message.content;
+                if (!['system', 'user', 'assistant'].includes(role)) {
+                    // Convert non-standard roles to user role and prepend the original role to the content
+                    role = 'user';
+                    content = `[${message.role}] ${message.content}`;
+                }
+                return {
+                    role: role as "user" | "assistant" | "system",
+                    content,
+                };
+            });
 
-        for await (const chunk of stream) {
-            const token = chunk.choices[0]?.delta?.content;
-            if (token) {
-                yield token;
+            const response = await this.client.chat.completions.create({
+                model: this.model,
+                messages: openaiMessages,
+            });
+
+            return {
+                content: response.choices[0]?.message?.content ?? "",
+                provider: this.name,
+                model: this.model,
+            };
+        }
+
+        async *chatStream(messages: ChatMessage[]): AsyncGenerator<string> {
+            this.log("Streaming request to OpenRouter...");
+
+            const openaiMessages = messages.map((message) => {
+                let role = message.role;
+                let content = message.content;
+                if (!['system', 'user', 'assistant'].includes(role)) {
+                    // Convert non-standard roles to user role and prepend the original role to the content
+                    role = 'user';
+                    content = `[${message.role}] ${message.content}`;
+                }
+                return {
+                    role: role as "user" | "assistant" | "system",
+                    content,
+                };
+            });
+
+            const stream = await this.client.chat.completions.create({
+                model: this.model,
+                messages: openaiMessages,
+                stream: true,
+            });
+
+            for await (const chunk of stream) {
+                const token = chunk.choices[0]?.delta?.content;
+                if (token) {
+                    yield token;
+                }
             }
         }
+
+    async *generateStream(messages: ChatMessage[]): AsyncGenerator<string> {
+        // For OpenRouter, generateStream is the same as chatStream
+        yield* this.chatStream(messages);
     }
 }

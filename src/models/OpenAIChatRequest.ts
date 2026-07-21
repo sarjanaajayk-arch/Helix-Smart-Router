@@ -15,4 +15,5 @@ export interface OpenAIChatRequest {
     tool_choice?: any;
 
     user?: string;
+    stream?: boolean;
 }

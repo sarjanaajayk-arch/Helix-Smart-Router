@@ -1,5 +1,6 @@
 import { PROVIDERS } from "./ProviderRegistry";
 import { ProviderSelector } from "./ProviderSelector";
+import { ProviderCapabilities } from "../models/ProviderCapabilities";
 
 import { TaskType } from "../types/TaskType";
 
@@ -18,6 +19,12 @@ export class RoutingRules {
 );
 
         return provider.provider;
+    }
+
+    static getAllProviders(): string[] {
+        return PROVIDERS
+            .filter((p: ProviderCapabilities) => p.enabled)
+            .map((p: ProviderCapabilities) => p.provider);
     }
 
     static selectModel(taskType: TaskType): string {
