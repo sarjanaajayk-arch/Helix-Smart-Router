@@ -181,4 +181,33 @@ export class OpenAIController {
             }
         }
     }
+    static async listModels(req: Request, res: Response): Promise<void> {
+        try {
+            const allModelsByProvider = await providerManager.getAllModels();
+            const dataArray = [];
+            for (const [providerName, models] of Object.entries(allModelsByProvider)) {
+                for (const model of models) {
+                    dataArray.push({
+                        id: model.id,
+                        object: "model",
+                        created: Math.floor(Date.now() / 1000),
+                        owned_by: providerName,
+                    });
+                }
+            }
+            res.status(200).json({
+                object: "list",
+                data: dataArray
+            });
+        } catch (error) {
+            console.error("OpenAI Models Error:", error);
+            res.status(500).json({
+                error: {
+                    message: error instanceof Error ? error.message : "Internal server error",
+                    type: "internal_error",
+                    code: "internal_error",
+                }
+            });
+        }
+    }
 }
