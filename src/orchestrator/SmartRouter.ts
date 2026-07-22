@@ -119,85 +119,95 @@ export class SmartRouter {
 }
 
     /**
-     * Routes a normal request.
-     */
-    async route(
-        request: RoutingRequest
-    ): Promise<RoutingResponse> {
+     /**
+      * Routes a normal request.
+      */
+     async route(
+       request: RoutingRequest
+     ): Promise<RoutingResponse> {
+       const context: RoutingContext = {
+         request,
+       };
 
-        const context: RoutingContext = {
-            request,
-        };
+       context.provider =
+         this.selectProvider(request);
 
-        context.provider =
-            this.selectProvider(request);
+       context.estimatedTokens =
+         this.estimateTokens(request.prompt);
 
-        context.estimatedTokens =
-            this.estimateTokens(request.prompt);
+       const policy = this.selectPolicy(request);
 
-        const policy = this.selectPolicy(request);
+       context.selectedModel =
+         ModelSelector.select(
+           context.provider,
+           request.taskType,
+           context.estimatedTokens,
+           policy
+         );
 
-        context.selectedModel =
-            ModelSelector.select(
-                context.provider,
-                request.taskType,
-                context.estimatedTokens,
-                policy
-            );
+       console.log(`[SmartRouter] request.maxTokens: ${request.maxTokens}`);
+       const response =
+         await this.providerManager.executeChat(
+           context.provider!,
+           this.buildMessages(request),
+           context.selectedModel!,
+           {
+             maxTokens: request.maxTokens,
+             temperature: request.temperature,
+           }
+         );
+       console.log(`[SmartRouter] options.maxTokens: ${request.maxTokens}`);
 
-        const response =
-            await this.providerManager.executeChat(
-                context.provider!,
-                this.buildMessages(request),
-                context.selectedModel!
-            );
+       return {
+         content: response.content,
+         provider: response.provider,
+         model: response.model,
+       };
+     }
 
-        return {
-            content: response.content,
-            provider: response.provider,
-            model: response.model,
-        };
-    }
+     /**
+      * Routes a streaming request.
+      */
+     async *routeStream(
+       request: RoutingRequest
+     ): AsyncGenerator<string> {
+       const context: RoutingContext = {
+         request,
+       };
 
-    /**
-         * Routes a streaming request.
-         */
-        async *routeStream(
-            request: RoutingRequest
-        ): AsyncGenerator<string> {
+       context.provider =
+         this.selectProvider(request);
 
-            const context: RoutingContext = {
-                request,
-            };
+       context.estimatedTokens =
+         this.estimateTokens(request.prompt);
 
-            context.provider =
-                this.selectProvider(request);
+       const policy = this.selectPolicy(request);
 
-            context.estimatedTokens =
-                this.estimateTokens(request.prompt);
+       context.selectedModel =
+         ModelSelector.select(
+           context.provider,
+           request.taskType,
+           context.estimatedTokens,
+           policy
+         );
 
-            const policy = this.selectPolicy(request);
+       const stream =
+         this.providerManager.executeChatStream(
+           context.provider!,
+           this.buildMessages(request),
+           context.selectedModel!,
+           {
+             maxTokens: request.maxTokens,
+             temperature: request.temperature,
+           }
+         );
 
-            context.selectedModel =
-                ModelSelector.select(
-                    context.provider,
-                    request.taskType,
-                    context.estimatedTokens,
-                    policy
-                );
-
-            const stream =
-                this.providerManager.executeChatStream(
-                    context.provider!,
-                    this.buildMessages(request),
-                    context.selectedModel!
-                );
-
-            console.log("[SmartRouter] Starting to iterate providerManager.executeChatStream");
-            for await (const chunk of stream) {
-                console.log("[SmartRouter] Received chunk from providerManager, length:", chunk.length);
-                yield chunk;
-            }
+       console.log("[SmartRouter] Starting to iterate providerManager.executeChatStream");
+       for await (const chunk of stream) {
+         console.log("[SmartRouter] Received chunk from providerManager, length:", chunk.length);
+         yield chunk;
+       }
+       console.log("[SmartRouter] Stream iteration complete");
             console.log("[SmartRouter] Stream iteration complete");
         }
 }

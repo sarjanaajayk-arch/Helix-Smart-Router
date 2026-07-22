@@ -24,33 +24,44 @@ export interface AIModelInfo {
     outputPricePerMillionTokens?: number;
 }
 
+export interface GenerationOptions {
+  maxTokens?: number;
+  temperature?: number;
+  topP?: number;
+  stopSequences?: string[];
+  topK?: number;
+}
+
 export interface AIProvider {
-    readonly name: string;
+  readonly name: string;
 
-    /**
-     * Get available models from the provider
-     */
-    getAvailableModels(): Promise<AIModelInfo[]>;
+  /**
+   * Get available models from the provider
+   */
+  getAvailableModels(): Promise<AIModelInfo[]>;
 
-    /**
-     * Standard request-response chat
-     */
-    chat(
-        messages: ChatMessage[]
-    ): Promise<ChatResponse>;
+  /**
+   * Standard request-response chat
+   */
+  chat(
+    messages: ChatMessage[],
+    options?: GenerationOptions
+  ): Promise<ChatResponse>;
 
-    /**
-     * Streaming chat
-     * Returns each generated token/chunk asynchronously.
-     */
-    chatStream(
-        messages: ChatMessage[]
-    ): AsyncGenerator<string>;
+  /**
+   * Streaming chat
+   * Returns each generated token/chunk asynchronously.
+   */
+  chatStream(
+    messages: ChatMessage[],
+    options?: GenerationOptions
+  ): AsyncGenerator<string>;
 
-    /**
-     * Generate a stream for OpenAI-compatible streaming
-     */
-    generateStream(
-        messages: ChatMessage[]
-    ): AsyncGenerator<string>;
+  /**
+   * Generate a stream for OpenAI-compatible streaming
+   */
+  generateStream(
+    messages: ChatMessage[],
+    options?: GenerationOptions
+  ): AsyncGenerator<string>;
 }
