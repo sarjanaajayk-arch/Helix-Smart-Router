@@ -270,10 +270,10 @@ export class ProviderManager {
             const latency = Date.now() - startTime;
 
             // Estimate token usage for accounting
-                        const promptText = messages.map(m => m.content).join("\n");
-                        const promptTokens = TokenAccounting.estimateTokens(promptText);
-                        const completionTokens = TokenAccounting.estimateTokens(response.content);
-                        TokenAccounting.recordUsage(providerName as ProviderType, promptTokens, completionTokens);
+            const promptText = messages.map(m => m.content).join("\n");
+            const promptTokens = TokenAccounting.estimateTokens(promptText);
+            const completionTokens = TokenAccounting.estimateTokens(response.content);
+            TokenAccounting.recordUsage(providerName as ProviderType, promptTokens, completionTokens);
 
             HealthMonitor.recordSuccess(providerName as ProviderType);
             MetricsManager.recordSuccess(providerName as ProviderType, latency);

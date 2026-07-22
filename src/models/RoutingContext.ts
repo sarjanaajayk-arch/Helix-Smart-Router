@@ -17,4 +17,7 @@ export interface RoutingContext {
     score?: number;
 
     explanation?: RoutingExplanation;
+
+    // API Key identification for usage metering
+    apiKeyId?: string;
 }

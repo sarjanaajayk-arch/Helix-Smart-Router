@@ -12,4 +12,7 @@ export interface RoutingRequest {
     temperature?: number;
     maxTokens?: number;
     stream?: boolean;
+
+    // API Key identification for usage metering
+    apiKeyId?: string;
 }

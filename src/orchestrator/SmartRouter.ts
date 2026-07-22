@@ -9,6 +9,8 @@ import { ModelSelector } from "./ModelSelector";
 import { RoutingPolicy } from "../types/RoutingPolicy";
 import { CircuitBreaker } from "./CircuitBreaker";
 import { ProviderType } from "../types/ProviderType";
+import { usageMeter } from "../services/UsageMeter";
+import { helixLogger } from "../config/logger";
 
 export class SmartRouter {
 
@@ -43,37 +45,37 @@ export class SmartRouter {
     }
 
     /**
-         * Selects the provider for a request.
-         */
-        private selectProvider(
-            request: RoutingRequest
-        ): ProviderType {
+     * Selects the provider for a request.
+     */
+    private selectProvider(
+        request: RoutingRequest
+    ): ProviderType {
 
-            if (!RouterConfig.enableSmartRouting) {
-                const defaultProvider = RouterConfig.defaultProvider;
-                // Check circuit breaker for default provider
-                if (!CircuitBreaker.isAvailable(defaultProvider)) {
-                    throw new Error(`Circuit breaker open for provider: ${defaultProvider}`);
-                }
-                return defaultProvider;
+        if (!RouterConfig.enableSmartRouting) {
+            const defaultProvider = RouterConfig.defaultProvider;
+            // Check circuit breaker for default provider
+            if (!CircuitBreaker.isAvailable(defaultProvider)) {
+                throw new Error(`Circuit breaker open for provider: ${defaultProvider}`);
             }
-
-            const selectedProvider = RoutingRules.selectProvider(request.taskType) as ProviderType;
-
-            // Check circuit breaker for selected provider
-            if (!CircuitBreaker.isAvailable(selectedProvider)) {
-                // Try fallback providers
-                const providers = RoutingRules.getAllProviders() as ProviderType[];
-                for (const provider of providers) {
-                    if (provider !== selectedProvider && CircuitBreaker.isAvailable(provider)) {
-                        return provider;
-                    }
-                }
-                throw new Error(`Circuit breaker open for all available providers`);
-            }
-
-            return selectedProvider;
+            return defaultProvider;
         }
+
+        const selectedProvider = RoutingRules.selectProvider(request.taskType) as ProviderType;
+
+        // Check circuit breaker for selected provider
+        if (!CircuitBreaker.isAvailable(selectedProvider)) {
+            // Try fallback providers
+            const providers = RoutingRules.getAllProviders() as ProviderType[];
+            for (const provider of providers) {
+                if (provider !== selectedProvider && CircuitBreaker.isAvailable(provider)) {
+                    return provider;
+                }
+            }
+            throw new Error(`Circuit breaker open for all available providers`);
+        }
+
+        return selectedProvider;
+    }
 
     /**
      * Selects the routing policy for a request.
@@ -119,95 +121,139 @@ export class SmartRouter {
 }
 
     /**
-     /**
-      * Routes a normal request.
-      */
-     async route(
-       request: RoutingRequest
-     ): Promise<RoutingResponse> {
-       const context: RoutingContext = {
-         request,
-       };
+     * Routes a normal request.
+     */
+    async route(
+        request: RoutingRequest
+    ): Promise<RoutingResponse> {
+        const context: RoutingContext = {
+            request,
+        };
 
-       context.provider =
-         this.selectProvider(request);
+        context.provider =
+            this.selectProvider(request);
 
-       context.estimatedTokens =
-         this.estimateTokens(request.prompt);
+        context.estimatedTokens =
+            this.estimateTokens(request.prompt);
 
-       const policy = this.selectPolicy(request);
+        const policy = this.selectPolicy(request);
 
-       context.selectedModel =
-         ModelSelector.select(
-           context.provider,
-           request.taskType,
-           context.estimatedTokens,
-           policy
-         );
+        context.selectedModel =
+            ModelSelector.select(
+                context.provider,
+                request.taskType,
+                context.estimatedTokens,
+                policy
+            );
 
-       console.log(`[SmartRouter] request.maxTokens: ${request.maxTokens}`);
-       const response =
-         await this.providerManager.executeChat(
-           context.provider!,
-           this.buildMessages(request),
-           context.selectedModel!,
-           {
-             maxTokens: request.maxTokens,
-             temperature: request.temperature,
-           }
-         );
-       console.log(`[SmartRouter] options.maxTokens: ${request.maxTokens}`);
+        const startTime = Date.now();
+        let response;
+        let error: Error | null = null;
 
-       return {
-         content: response.content,
-         provider: response.provider,
-         model: response.model,
-       };
-     }
-
-     /**
-      * Routes a streaming request.
-      */
-     async *routeStream(
-       request: RoutingRequest
-     ): AsyncGenerator<string> {
-       const context: RoutingContext = {
-         request,
-       };
-
-       context.provider =
-         this.selectProvider(request);
-
-       context.estimatedTokens =
-         this.estimateTokens(request.prompt);
-
-       const policy = this.selectPolicy(request);
-
-       context.selectedModel =
-         ModelSelector.select(
-           context.provider,
-           request.taskType,
-           context.estimatedTokens,
-           policy
-         );
-
-       const stream =
-         this.providerManager.executeChatStream(
-           context.provider!,
-           this.buildMessages(request),
-           context.selectedModel!,
-           {
-             maxTokens: request.maxTokens,
-             temperature: request.temperature,
-           }
-         );
-
-       console.log("[SmartRouter] Starting to iterate providerManager.executeChatStream");
-       for await (const chunk of stream) {
-         console.log("[SmartRouter] Received chunk from providerManager, length:", chunk.length);
-         yield chunk;
-       }
-       console.log("[SmartRouter] Stream iteration complete");
-            console.log("[SmartRouter] Stream iteration complete");
+        try {
+            response =
+                await this.providerManager.executeChat(
+                    context.provider!,
+                    this.buildMessages(request),
+                    context.selectedModel!,
+                    {
+                        maxTokens: request.maxTokens,
+                        temperature: request.temperature,
+                    }
+                );
+        } catch (err) {
+            error = err instanceof Error ? err : new Error(String(err));
+            throw error;
+        } finally {
+            const latencyMs = Date.now() - startTime;
+            const apiKeyId = request.apiKeyId || "unknown";
+            
+            // Record usage (success or failure)
+            usageMeter.recordRequestUsage({
+                requestId: request.requestId || `req-${Date.now()}`,
+                apiKeyId,
+                provider: context.provider!,
+                model: context.selectedModel!,
+                prompt: request.prompt,
+                response: response?.content || "",
+                latencyMs,
+                success: !error,
+                errorMessage: error?.message
+            });
         }
+
+        return {
+            content: response!.content,
+            provider: response!.provider,
+            model: response!.model,
+        };
+    }
+
+    /**
+     * Routes a streaming request.
+     */
+    async *routeStream(
+        request: RoutingRequest
+    ): AsyncGenerator<string> {
+        const context: RoutingContext = {
+            request,
+        };
+
+        context.provider =
+            this.selectProvider(request);
+
+        context.estimatedTokens =
+            this.estimateTokens(request.prompt);
+
+        const policy = this.selectPolicy(request);
+
+        context.selectedModel =
+            ModelSelector.select(
+                context.provider,
+                request.taskType,
+                context.estimatedTokens,
+                policy
+            );
+
+        const startTime = Date.now();
+        let fullResponse = "";
+        let error: Error | null = null;
+
+        try {
+            const stream =
+                this.providerManager.executeChatStream(
+                    context.provider!,
+                    this.buildMessages(request),
+                    context.selectedModel!,
+                    {
+                        maxTokens: request.maxTokens,
+                        temperature: request.temperature,
+                    }
+                );
+
+            for await (const chunk of stream) {
+                fullResponse += chunk;
+                yield chunk;
+            }
+        } catch (err) {
+            error = err instanceof Error ? err : new Error(String(err));
+            throw error;
+        } finally {
+            const latencyMs = Date.now() - startTime;
+            const apiKeyId = request.apiKeyId || "unknown";
+            
+            // Record usage (success or failure)
+            usageMeter.recordRequestUsage({
+                requestId: request.requestId || `req-${Date.now()}`,
+                apiKeyId,
+                provider: context.provider!,
+                model: context.selectedModel!,
+                prompt: request.prompt,
+                response: fullResponse,
+                latencyMs,
+                success: !error,
+                errorMessage: error?.message
+            });
+        }
+    }
 }
