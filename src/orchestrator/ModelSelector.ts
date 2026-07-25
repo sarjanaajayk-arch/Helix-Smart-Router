@@ -10,8 +10,10 @@ export class ModelSelector {
         provider: string,
         task: TaskType,
         estimatedTokens: number,
-        policy: RoutingPolicy = RoutingPolicy.BALANCED
+        policy: RoutingPolicy = RoutingPolicy.BALANCED,
+        requestedModel?: string
     ): string {
+        console.log(`[ModelSelector.select] Input: provider=${provider}, task=${task}, estimatedTokens=${estimatedTokens}, policy=${policy}, requestedModel=${requestedModel}`);
 
         const models = ModelRegistryService
             .getEnabledModels()
@@ -20,7 +22,21 @@ export class ModelSelector {
             );
 
         if (models.length === 0) {
+            console.log(`[ModelSelector.select] No models found for provider ${provider}, returning empty string`);
             return "";
+        }
+
+        console.log(`[ModelSelector.select] Available models for provider ${provider}: ${models.map(m => m.id).join(', ')}`);
+
+        // If user requested a specific model that exists and is enabled for this provider, prefer it
+        if (requestedModel) {
+            const requested = models.find(m => m.id === requestedModel);
+            if (requested && this.matchesTask(requested, task) && requested.contextWindow >= estimatedTokens) {
+                console.log(`[ModelSelector.select] Using requested model: ${requested.id}`);
+                return requested.id;
+            } else {
+                console.log(`[ModelSelector.select] Requested model ${requestedModel} not found/not suitable, falling back to scoring`);
+            }
         }
 
         const candidates = models.filter(model =>

@@ -45,6 +45,7 @@ export interface AIProvider {
    */
   chat(
     messages: ChatMessage[],
+    model: string,
     options?: GenerationOptions
   ): Promise<ChatResponse>;
 
@@ -54,6 +55,7 @@ export interface AIProvider {
    */
   chatStream(
     messages: ChatMessage[],
+    model: string,
     options?: GenerationOptions
   ): AsyncGenerator<string>;
 
@@ -62,6 +64,7 @@ export interface AIProvider {
    */
   generateStream(
     messages: ChatMessage[],
+    model: string,
     options?: GenerationOptions
   ): AsyncGenerator<string>;
 }

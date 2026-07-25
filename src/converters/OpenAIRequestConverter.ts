@@ -5,6 +5,7 @@ import { TaskType } from "../types/TaskType";
 export class OpenAIRequestConverter {
 
     public static toRoutingRequest(openaiRequest: OpenAIChatRequest): RoutingRequest {
+        console.log(`[OpenAIRequestConverter] Incoming openaiRequest.model: ${openaiRequest.model}`);
 
         let taskType: TaskType;
 
@@ -17,12 +18,16 @@ export class OpenAIRequestConverter {
         const routingRequest: RoutingRequest = {
             prompt: this.buildPromptFromMessages(openaiRequest.messages),
             taskType,
-
             model: openaiRequest.model,
             temperature: openaiRequest.temperature,
             maxTokens: openaiRequest.max_tokens,
             stream: openaiRequest.stream ?? false,
         };
+
+        console.log(`[OpenAIRequestConverter] openaiRequest.max_tokens: ${openaiRequest.max_tokens}`);
+        console.log(`[OpenAIRequestConverter] routingRequest.maxTokens: ${routingRequest.maxTokens}`);
+        console.log(`[OpenAIRequestConverter] openaiRequest.model: ${openaiRequest.model}`);
+        console.log(`[OpenAIRequestConverter] routingRequest.taskType: ${routingRequest.taskType}`);
 
         return routingRequest;
     }

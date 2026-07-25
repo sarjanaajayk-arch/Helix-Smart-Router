@@ -20,6 +20,8 @@ export class OpenAIController {
         try {
             const openaiRequest: OpenAIChatRequest = req.body;
 
+            console.log(`[OpenAIController.chatCompletions] Incoming request.model: ${openaiRequest.model}`);
+
             if (!openaiRequest.model || !openaiRequest.messages) {
                 res.status(400).json({
                     error: {
@@ -33,6 +35,7 @@ export class OpenAIController {
 
             // Handle streaming request
             if (openaiRequest.stream === true) {
+                console.log(`[OpenAIController.chatCompletions] Streaming request, model: ${openaiRequest.model}`);
                 await OpenAIController.handleStreamingChatCompletions(req, res, openaiRequest);
                 return;
             }
@@ -41,15 +44,21 @@ export class OpenAIController {
             const routingRequest: RoutingRequest =
                 OpenAIRequestConverter.toRoutingRequest(openaiRequest);
 
+            console.log(`[OpenAIController.chatCompletions] After converter, routingRequest.model: ${routingRequest.model}`);
+
             const routingResponse: RoutingResponse = await smartRouter.route(
                 routingRequest
             );
+
+            console.log(`[OpenAIController.chatCompletions] After smartRouter.route, response.model: ${routingResponse.model}`);
 
             const openaiResponse: OpenAIChatResponse =
                 OpenAIResponseConverter.toOpenAIResponse(
                     routingResponse,
                     openaiRequest.model
                 );
+
+            console.log(`[OpenAIController.chatCompletions] Final response model: ${openaiResponse.model}`);
 
             res.status(200).json(openaiResponse);
         } catch (error) {
@@ -77,8 +86,12 @@ export class OpenAIController {
         res: Response,
         openaiRequest: OpenAIChatRequest
     ): Promise<void> {
+        console.log(`[OpenAIController.handleStreamingChatCompletions] Incoming openaiRequest.model: ${openaiRequest.model}`);
+        
         const routingRequest: RoutingRequest =
             OpenAIRequestConverter.toRoutingRequest(openaiRequest);
+
+        console.log(`[OpenAIController.handleStreamingChatCompletions] After converter, routingRequest.model: ${routingRequest.model}`);
         // Ensure stream flag is set (though conversion may already set it to false)
         routingRequest.stream = true;
 
