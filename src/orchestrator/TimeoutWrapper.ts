@@ -23,14 +23,11 @@ export class TimeoutWrapper {
             }, timeoutMs);
         });
 
-        try {
-            const result = await Promise.race([promise, timeoutPromise]);
-            clearTimeout(timeoutId!);
-            return result;
-        } catch (error) {
-            clearTimeout(timeoutId!);
-            throw error;
-        }
+       try {
+    return await Promise.race([promise, timeoutPromise]);
+} finally {
+    clearTimeout(timeoutId!);
+}
     }
 
     /**

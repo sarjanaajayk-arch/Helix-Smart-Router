@@ -4,23 +4,22 @@ import { helixLogger } from "../config/logger";
 export interface RateLimitConfig {
   windowMs: number;
   max: number;
-  headerName?: string;
-  queryParamName?: string;
   keyGenerator?: (req: Request) => string;
   skip?: (req: Request) => boolean;
-  handler?: (req: Request, res: Response, next: NextFunction) => void;
+  handler?: (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) => void;
 }
 
 const DEFAULT_RATE_LIMIT_CONFIG: RateLimitConfig = {
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each key to 100 requests per windowMs
-  headerName: "x-rate-limit-remaining",
-  queryParamName: "api_key",
+  max: 100, // 100 requests per window
 };
 
 let rateLimitConfig: RateLimitConfig = DEFAULT_RATE_LIMIT_CONFIG;
 
-// In-memory store for rate limiting (in production, use Redis)
 interface RateLimitEntry {
   count: number;
   resetTime: number;
@@ -28,32 +27,26 @@ interface RateLimitEntry {
 
 const rateLimitStore = new Map<string, RateLimitEntry>();
 
-/**
- * Clean up expired entries from the rate limit store
- */
 function cleanupExpiredEntries(): void {
   const now = Date.now();
+
   for (const [key, entry] of rateLimitStore.entries()) {
-    if (entry.resetTime < now) {
+    if (entry.resetTime <= now) {
       rateLimitStore.delete(key);
     }
   }
 }
 
-// Clean up expired entries every minute
-setInterval(cleanupExpiredEntries, 60 * 1000);
+const cleanupTimer = setInterval(cleanupExpiredEntries, 60 * 1000);
+cleanupTimer.unref();
 
-export function configureRateLimit(config: Partial<RateLimitConfig>): void {
-  rateLimitConfig = { ...DEFAULT_RATE_LIMIT_CONFIG, ...config };
-  if (config.keyGenerator) {
-    rateLimitConfig.keyGenerator = config.keyGenerator;
-  }
-  if (config.skip) {
-    rateLimitConfig.skip = config.skip;
-  }
-  if (config.handler) {
-    rateLimitConfig.handler = config.handler;
-  }
+export function configureRateLimit(
+  config: Partial<RateLimitConfig>
+): void {
+  rateLimitConfig = {
+    ...DEFAULT_RATE_LIMIT_CONFIG,
+    ...config,
+  };
 }
 
 export function getRateLimitConfig(): Readonly<RateLimitConfig> {
@@ -61,36 +54,42 @@ export function getRateLimitConfig(): Readonly<RateLimitConfig> {
 }
 
 function getDefaultKey(req: Request): string {
-  // Use API key from auth middleware if available
-  if ((req as any).apiKey) {
-    return `apikey:${(req as any).apiKey}`;
+  if (req.apiKey) {
+    return `apikey:${req.apiKey}`;
   }
-  // Fallback to IP address
+
   return `ip:${req.ip || req.socket.remoteAddress || "unknown"}`;
 }
 
 function defaultSkip(req: Request): boolean {
-  // Skip rate limiting for health checks
-  if (req.path === "/health" || req.path === "/") {
-    return true;
-  }
-  return false;
+  return req.path === "/" || req.path === "/health";
 }
 
-function defaultHandler(req: Request, res: Response, next: NextFunction): void {
-  const key = rateLimitConfig.keyGenerator ? rateLimitConfig.keyGenerator(req) : getDefaultKey(req);
+function defaultHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void {
+  const key = rateLimitConfig.keyGenerator
+    ? rateLimitConfig.keyGenerator(req)
+    : getDefaultKey(req);
+
   const entry = rateLimitStore.get(key);
-  const retryAfter = entry ? Math.ceil((entry.resetTime - Date.now()) / 1000) : 0;
+
+  const retryAfter = entry
+    ? Math.max(0, Math.ceil((entry.resetTime - Date.now()) / 1000))
+    : 0;
 
   helixLogger.warn("Rate limit exceeded", {
     requestId: req.requestId,
     path: req.originalUrl,
     method: req.method,
-    keyPrefix: key.substring(0, 20) + "...",
+    identifier: key.startsWith("apikey:") ? "apikey" : req.ip,
     retryAfter,
   });
 
   res.setHeader("Retry-After", String(retryAfter));
+
   res.status(429).json({
     error: {
       message: "Too many requests, please try again later",
@@ -106,62 +105,78 @@ export function rateLimitMiddleware(
   res: Response,
   next: NextFunction
 ): void {
-  // Check if rate limiting should be skipped
-  if (rateLimitConfig.skip && rateLimitConfig.skip(req)) {
+  const shouldSkip = rateLimitConfig.skip
+    ? rateLimitConfig.skip(req)
+    : defaultSkip(req);
+
+  if (shouldSkip) {
     next();
     return;
   }
 
-  // Generate key for this request
   const key = rateLimitConfig.keyGenerator
     ? rateLimitConfig.keyGenerator(req)
     : getDefaultKey(req);
 
   const now = Date.now();
-  const windowMs = rateLimitConfig.windowMs;
-  const max = rateLimitConfig.max;
 
   let entry = rateLimitStore.get(key);
 
-  if (!entry || entry.resetTime < now) {
-    // First request or window has expired
+  if (!entry || entry.resetTime <= now) {
     entry = {
       count: 1,
-      resetTime: now + windowMs,
+      resetTime: now + rateLimitConfig.windowMs,
     };
+
     rateLimitStore.set(key, entry);
   } else {
-    // Increment count
-    entry.count++;
+    entry.count += 1;
   }
 
-  // Set rate limit headers
-  const remaining = Math.max(0, max - entry.count);
-  const resetTime = Math.ceil(entry.resetTime / 1000);
+  const remaining = Math.max(
+    0,
+    rateLimitConfig.max - entry.count
+  );
 
-  res.setHeader("X-RateLimit-Limit", String(max));
-  res.setHeader("X-RateLimit-Remaining", String(remaining));
-  res.setHeader("X-RateLimit-Reset", String(resetTime));
+  const reset = Math.ceil(entry.resetTime / 1000);
 
-  // Check if limit exceeded
-  if (entry.count > max) {
-    if (rateLimitConfig.handler) {
-      rateLimitConfig.handler(req, res, next);
-    } else {
-      defaultHandler(req, res, next);
-    }
+  req.rateLimitInfo = {
+    limit: rateLimitConfig.max,
+    remaining,
+    reset,
+  };
+
+  res.setHeader(
+    "X-RateLimit-Limit",
+    String(rateLimitConfig.max)
+  );
+
+  res.setHeader(
+    "X-RateLimit-Remaining",
+    String(remaining)
+  );
+
+  res.setHeader(
+    "X-RateLimit-Reset",
+    String(reset)
+  );
+
+  if (entry.count > rateLimitConfig.max) {
+    const handler = rateLimitConfig.handler ?? defaultHandler;
+    handler(req, res, next);
     return;
   }
 
   next();
 }
 
-// Cleanup on process exit
 process.on("SIGTERM", () => {
+  cleanupTimer.close();
   rateLimitStore.clear();
 });
 
 process.on("SIGINT", () => {
+  cleanupTimer.close();
   rateLimitStore.clear();
 });
 

@@ -1,20 +1,21 @@
 import { TaskType } from "../types/TaskType";
 import { RouterConfig } from "../config/RouterConfig";
+import { TimeoutConfig } from "../config/TimeoutConfig";
 import { RoutingContext } from "../models/RoutingContext";
 import { RoutingRequest } from "../models/RoutingRequest";
 import { RoutingResponse } from "../models/RoutingResponse";
 import { ProviderManager } from "../providers/ProviderManager";
+import { ProviderType } from "../types/ProviderType";
+import { RoutingPolicy } from "../types/RoutingPolicy";
+import { usageMeter } from "../services/UsageMeter";
+import { normalizeMaxTokens } from "../utils/tokenNormalizer";
 import { RoutingRules } from "./RoutingRules";
 import { ModelSelector } from "./ModelSelector";
-import { RoutingPolicy } from "../types/RoutingPolicy";
 import { CircuitBreaker } from "./CircuitBreaker";
-import { ProviderType } from "../types/ProviderType";
-import { usageMeter } from "../services/UsageMeter";
-import { helixLogger } from "../config/logger";
-import { normalizeMaxTokens } from "../utils/tokenNormalizer";
+import { RetryEngine } from "./RetryEngine";
+import { TimeoutWrapper } from "./TimeoutWrapper";
 
 export class SmartRouter {
-
     constructor(
         private readonly providerManager: ProviderManager
     ) {}
@@ -25,7 +26,6 @@ export class SmartRouter {
     private buildMessages(
         request: RoutingRequest
     ): { role: "user"; content: string }[] {
-
         return [
             {
                 role: "user",
@@ -41,7 +41,6 @@ export class SmartRouter {
     private estimateTokens(
         text: string
     ): number {
-
         return Math.ceil(text.length / 4);
     }
 
@@ -90,9 +89,7 @@ export class SmartRouter {
     private selectPolicy(
         request: RoutingRequest
     ): RoutingPolicy {
-
         switch (request.taskType) {
-
             case TaskType.CODE:
                 return RoutingPolicy.HIGHEST_QUALITY;
 
@@ -138,33 +135,31 @@ export class SmartRouter {
 
         console.log(`[SmartRouter.route] Incoming request.model: ${request.model}`);
 
-        context.provider =
-            this.selectProvider(request);
+        context.provider = this.selectProvider(request);
 
-        context.estimatedTokens =
-            this.estimateTokens(request.prompt);
+        context.estimatedTokens = this.estimateTokens(request.prompt);
 
         const policy = this.selectPolicy(request);
 
-        console.log(`[SmartRouter.route] After SmartRouter.selectProvider: provider=${context.provider}, policy=${policy}, estimatedTokens=${context.estimatedTokens}, request.model=${request.model}`);
+        console.log(
+            `[SmartRouter.route] After SmartRouter.selectProvider: provider=${context.provider}, policy=${policy}, estimatedTokens=${context.estimatedTokens}, request.model=${request.model}`
+        );
 
-        context.selectedModel =
-            ModelSelector.select(
-                context.provider!,
-                request.taskType,
-                context.estimatedTokens,
-                policy,
-                request.model
-            );
+        context.selectedModel = ModelSelector.select(
+            context.provider!,
+            request.taskType,
+            context.estimatedTokens,
+            policy,
+            request.model
+        );
 
-        console.log(`[SmartRouter.route] After ModelSelector.select: selectedModel=${context.selectedModel}, request.model=${request.model}`);
+        console.log(
+            `[SmartRouter.route] After ModelSelector.select: selectedModel=${context.selectedModel}, request.model=${request.model}`
+        );
 
-        // Normalize maxTokens based on the selected model and provider
         const normalizedMaxTokens = normalizeMaxTokens(
             context.provider!,
             request.maxTokens,
-            // We don't have modelMaxOutputTokens here; we could get it from the model info, but for now we pass undefined.
-            // The normalizeMaxTokens function will use the provider default and if modelMaxOutputTokens is undefined, it won't clamp.
             undefined
         );
 
@@ -176,16 +171,21 @@ export class SmartRouter {
         let error: Error | null = null;
 
         try {
-            response =
-                await this.providerManager.executeChat(
-                    context.provider!,
-                    this.buildMessages(request),
-                    context.selectedModel!,
-                    {
-                        maxTokens: normalizedMaxTokens,
-                        temperature: request.temperature,
-                    }
-                );
+            response = await RetryEngine.execute(() =>
+                TimeoutWrapper.withTimeout(
+                    this.providerManager.executeChat(
+                        context.provider!,
+                        this.buildMessages(request),
+                        context.selectedModel!,
+                        {
+                            maxTokens: normalizedMaxTokens,
+                            temperature: request.temperature,
+                        }
+                    ),
+                    TimeoutConfig.providerTimeoutMs,
+                    "Provider Chat Request"
+                )
+            );
         } catch (err) {
             error = err instanceof Error ? err : new Error(String(err));
             throw error;
@@ -193,7 +193,6 @@ export class SmartRouter {
             const latencyMs = Date.now() - startTime;
             const apiKeyId = request.apiKeyId || "unknown";
 
-            // Record usage (success or failure)
             usageMeter.recordRequestUsage({
                 requestId: request.requestId || `req-${Date.now()}`,
                 apiKeyId,
@@ -203,7 +202,7 @@ export class SmartRouter {
                 response: response?.content || "",
                 latencyMs,
                 success: !error,
-                errorMessage: error?.message
+                errorMessage: error?.message,
             });
         }
 
@@ -218,36 +217,36 @@ export class SmartRouter {
      * Routes a streaming request.
      */
     async *routeStream(
-            request: RoutingRequest
-        ): AsyncGenerator<string> {
-            const context: RoutingContext = {
-                request,
-            };
+        request: RoutingRequest
+    ): AsyncGenerator<string> {
+        const context: RoutingContext = {
+            request,
+        };
 
-            console.log(`[SmartRouter.routeStream] Incoming request.model: ${request.model}`);
+        console.log(`[SmartRouter.routeStream] Incoming request.model: ${request.model}`);
 
-            context.provider =
-                this.selectProvider(request);
+        context.provider = this.selectProvider(request);
 
-            context.estimatedTokens =
-                this.estimateTokens(request.prompt);
+        context.estimatedTokens = this.estimateTokens(request.prompt);
 
-            const policy = this.selectPolicy(request);
+        const policy = this.selectPolicy(request);
 
-            console.log(`[SmartRouter.routeStream] After SmartRouter.selectProvider: provider=${context.provider}, policy=${policy}, estimatedTokens=${context.estimatedTokens}, request.model=${request.model}`);
+        console.log(
+            `[SmartRouter.routeStream] After SmartRouter.selectProvider: provider=${context.provider}, policy=${policy}, estimatedTokens=${context.estimatedTokens}, request.model=${request.model}`
+        );
 
-            context.selectedModel =
-                ModelSelector.select(
-                    context.provider!,
-                    request.taskType,
-                    context.estimatedTokens,
-                    policy,
-                    request.model
-                );
+        context.selectedModel = ModelSelector.select(
+            context.provider!,
+            request.taskType,
+            context.estimatedTokens,
+            policy,
+            request.model
+        );
 
-            console.log(`[SmartRouter.routeStream] After ModelSelector.select: selectedModel=${context.selectedModel}, request.model=${request.model}`);
+        console.log(
+            `[SmartRouter.routeStream] After ModelSelector.select: selectedModel=${context.selectedModel}, request.model=${request.model}`
+        );
 
-        // Normalize maxTokens based on the selected model and provider
         const normalizedMaxTokens = normalizeMaxTokens(
             context.provider!,
             request.maxTokens,
@@ -259,7 +258,7 @@ export class SmartRouter {
         let error: Error | null = null;
 
         try {
-            const stream =
+            const stream = TimeoutWrapper.withStreamTimeout(
                 this.providerManager.executeChatStream(
                     context.provider!,
                     this.buildMessages(request),
@@ -268,7 +267,10 @@ export class SmartRouter {
                         maxTokens: normalizedMaxTokens,
                         temperature: request.temperature,
                     }
-                );
+                ),
+                TimeoutConfig.streamingTimeoutMs,
+                "Provider Streaming Request"
+            );
 
             for await (const chunk of stream) {
                 fullResponse += chunk;
@@ -281,7 +283,6 @@ export class SmartRouter {
             const latencyMs = Date.now() - startTime;
             const apiKeyId = request.apiKeyId || "unknown";
 
-            // Record usage (success or failure)
             usageMeter.recordRequestUsage({
                 requestId: request.requestId || `req-${Date.now()}`,
                 apiKeyId,
@@ -291,7 +292,7 @@ export class SmartRouter {
                 response: fullResponse,
                 latencyMs,
                 success: !error,
-                errorMessage: error?.message
+                errorMessage: error?.message,
             });
         }
     }

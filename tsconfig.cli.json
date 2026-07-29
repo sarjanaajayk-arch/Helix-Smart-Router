@@ -1,0 +1,37 @@
+{
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "target": "ES2022",
+    "jsx": "react-jsx",
+    "outDir": "./dist/cli",
+    "rootDir": "./src",
+    "allowJs": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": false,
+    "verbatimModuleSyntax": false,
+    "strict": true
+  },
+  "include": [
+    "src/cli/**/*",
+    "src/config/**/*",
+    "src/orchestrator/**/*",
+    "src/providers/**/*",
+    "src/registry/**/*",
+    "src/services/**/*",
+    "src/models/**/*",
+    "src/metrics/**/*",
+    "src/types/**/*",
+    "src/utils/**/*",
+    "src/validation/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}

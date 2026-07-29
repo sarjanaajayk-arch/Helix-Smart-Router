@@ -8,7 +8,7 @@ export interface ValidationRule {
   min?: number;
   max?: number;
   enum?: string[];
-  custom?: (value: any) => boolean | string;
+  custom?: (value: unknown) => boolean | string;
 }
 
 export interface ValidationConfig {
@@ -18,11 +18,16 @@ export interface ValidationConfig {
 }
 
 function validateField(
-  value: any,
+  value: unknown,
   rule: ValidationRule,
   path: string
 ): string | null {
-  if (rule.required && (value === undefined || value === null || value === "")) {
+  if (
+    rule.required &&
+    (value === undefined ||
+      value === null ||
+      (typeof value === "string" && value.trim() === ""))
+  ) {
     return `${path}.${rule.field} is required`;
   }
 
@@ -31,38 +36,64 @@ function validateField(
   }
 
   if (rule.type) {
-    const actualType = Array.isArray(value) ? "array" : typeof value;
+    const actualType = Array.isArray(value)
+      ? "array"
+      : value !== null
+        ? typeof value
+        : "null";
+
     if (actualType !== rule.type) {
       return `${path}.${rule.field} must be of type ${rule.type}, got ${actualType}`;
     }
   }
 
-  if (rule.type === "string" || rule.type === "array") {
-    if (rule.min !== undefined && value.length < rule.min) {
-      return `${path}.${rule.field} must have at least ${rule.min} items/characters`;
+  if (rule.type === "string") {
+    const text = value as string;
+
+    if (rule.min !== undefined && text.trim().length < rule.min) {
+      return `${path}.${rule.field} must have at least ${rule.min} characters`;
     }
-    if (rule.max !== undefined && value.length > rule.max) {
-      return `${path}.${rule.field} must have at most ${rule.max} items/characters`;
+
+    if (rule.max !== undefined && text.length > rule.max) {
+      return `${path}.${rule.field} must have at most ${rule.max} characters`;
+    }
+  }
+
+  if (rule.type === "array") {
+    const array = value as unknown[];
+
+    if (rule.min !== undefined && array.length < rule.min) {
+      return `${path}.${rule.field} must contain at least ${rule.min} items`;
+    }
+
+    if (rule.max !== undefined && array.length > rule.max) {
+      return `${path}.${rule.field} must contain at most ${rule.max} items`;
     }
   }
 
   if (rule.type === "number") {
-    if (rule.min !== undefined && value < rule.min) {
+    const number = value as number;
+
+    if (rule.min !== undefined && number < rule.min) {
       return `${path}.${rule.field} must be at least ${rule.min}`;
     }
-    if (rule.max !== undefined && value > rule.max) {
+
+    if (rule.max !== undefined && number > rule.max) {
       return `${path}.${rule.field} must be at most ${rule.max}`;
     }
   }
 
-  if (rule.enum && !rule.enum.includes(value)) {
+  if (rule.enum && !rule.enum.includes(value as string)) {
     return `${path}.${rule.field} must be one of: ${rule.enum.join(", ")}`;
   }
 
   if (rule.custom) {
     const result = rule.custom(value);
+
     if (result !== true) {
-      return `${path}.${rule.field}: ${typeof result === "string" ? result : "validation failed"}`;
+      return `${path}.${rule.field}: ${
+        typeof result === "string" ? result : "validation failed"
+      }`;
     }
   }
 
@@ -75,25 +106,28 @@ export function validationMiddleware(config: ValidationConfig) {
 
     if (config.body) {
       for (const rule of config.body) {
-        const value = req.body?.[rule.field];
-        const error = validateField(value, rule, "body");
-        if (error) errors.push(error);
+        const error = validateField(req.body?.[rule.field], rule, "body");
+        if (error) {
+          errors.push(error);
+        }
       }
     }
 
     if (config.query) {
       for (const rule of config.query) {
-        const value = req.query?.[rule.field];
-        const error = validateField(value, rule, "query");
-        if (error) errors.push(error);
+        const error = validateField(req.query?.[rule.field], rule, "query");
+        if (error) {
+          errors.push(error);
+        }
       }
     }
 
     if (config.params) {
       for (const rule of config.params) {
-        const value = req.params?.[rule.field];
-        const error = validateField(value, rule, "params");
-        if (error) errors.push(error);
+        const error = validateField(req.params?.[rule.field], rule, "params");
+        if (error) {
+          errors.push(error);
+        }
       }
     }
 
@@ -113,6 +147,7 @@ export function validationMiddleware(config: ValidationConfig) {
           details: errors,
         },
       });
+
       return;
     }
 
@@ -122,30 +157,44 @@ export function validationMiddleware(config: ValidationConfig) {
 
 export const openAIChatValidation = validationMiddleware({
   body: [
-    { field: "model", required: true, type: "string", min: 1 },
-    { field: "messages", required: true, type: "array", min: 1 },
+    {
+      field: "model",
+      required: true,
+      type: "string",
+      min: 1,
+    },
+    {
+      field: "messages",
+      required: true,
+      type: "array",
+      min: 1,
+    },
     {
       field: "temperature",
-      required: false,
       type: "number",
       min: 0,
       max: 2,
     },
     {
       field: "max_tokens",
-      required: false,
       type: "number",
       min: 1,
       max: 32768,
     },
     {
       field: "top_p",
-      required: false,
       type: "number",
       min: 0,
       max: 1,
     },
-    { field: "stream", required: false, type: "boolean" },
-    { field: "user", required: false, type: "string", max: 256 },
+    {
+      field: "stream",
+      type: "boolean",
+    },
+    {
+      field: "user",
+      type: "string",
+      max: 256,
+    },
   ],
 });

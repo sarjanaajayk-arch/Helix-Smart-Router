@@ -9,31 +9,42 @@
     "start": "node dist/server.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "cli": "node --import tsx src/cli/main.tsx",
+    "cli:build": "tsc -p tsconfig.cli.json",
+    "cli:start": "node dist/cli/cli/main.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
     "@google/genai": "^2.11.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "ink": "5.2.1",
+    "ink-select-input": "^5.0.0",
+    "ink-spinner": "^5.0.0",
+    "ink-text-input": "^5.0.1",
     "openai": "^6.46.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "winston": "^3.19.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/express-rate-limit": "^5.1.3",
-    "@types/node": "^26.1.1",
+    "@types/node": "^26.1.2",
     "@types/supertest": "^7.2.0",
     "nodemon": "^3.1.14",
     "supertest": "^7.2.2",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.9.3",
     "vitest": "^4.1.10"
   }
 }

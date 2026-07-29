@@ -1,10 +1,10 @@
 import { PROVIDERS } from "./ProviderRegistry";
 import { ProviderSelector } from "./ProviderSelector";
+import { CapabilityFilter } from "./CapabilityFilter";
 import { ProviderCapabilities } from "../models/ProviderCapabilities";
 
 import { TaskType } from "../types/TaskType";
 import { ModelRegistryService } from "../registry/ModelRegistryService";
-import { CapabilityFilter } from "./CapabilityFilter";
 
 export class RoutingRules {
 

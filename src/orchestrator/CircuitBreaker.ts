@@ -17,7 +17,7 @@ export class CircuitBreaker {
     // Configuration
     private static readonly FAILURE_THRESHOLD = 5;        // failures before opening
     private static readonly RESET_TIMEOUT = TimeoutConfig.requestTimeoutMs; // 60s before half-open
-    private static readonly HALF_OPEN_SUCCESS_THRESHOLD = 2; // successes in half-open before closing
+    // successes in half-open before closing
     
     static initialize(providers: ProviderType[]): void {
         providers.forEach(provider => {

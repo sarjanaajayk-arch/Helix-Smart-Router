@@ -18,8 +18,11 @@ import readyRoutes from "./routes/readyRoutes";
 
 import { requestIdMiddleware } from "./middlewares/requestIdMiddleware";
 import { requestLoggingMiddleware } from "./middlewares/requestLoggingMiddleware";
-import { authMiddleware, optionalAuthMiddleware, configureAuth } from "./middlewares/authMiddleware";
-import { rateLimitMiddleware, configureRateLimit } from "./middlewares/rateLimitMiddleware";
+import { authMiddleware, configureAuth } from "./middlewares/authMiddleware";
+import {
+    rateLimitMiddleware,
+    configureRateLimit,
+} from "./middlewares/rateLimitMiddleware";
 
 const app = express();
 
@@ -35,7 +38,7 @@ const smartRouter = new SmartRouter(providerManager);
 /* --------------------------------- */
 
 HealthMonitor.initialize(
- PROVIDERS.map((provider) => provider.provider)
+    PROVIDERS.map((provider) => provider.provider)
 );
 
 /* --------------------------------- */
@@ -43,7 +46,10 @@ HealthMonitor.initialize(
 /* --------------------------------- */
 
 configureAuth({
- apiKeys: process.env.API_KEYS?.split(",").map((k) => k.trim()) ?? [],
+    apiKeys:
+        process.env.API_KEYS
+            ?.split(",")
+            .map((key) => key.trim()) ?? [],
 });
 
 /* --------------------------------- */
@@ -57,18 +63,18 @@ app.use(requestIdMiddleware);
 app.use(requestLoggingMiddleware);
 
 /* --------------------------------- */
-/* Rate Limit Middleware */
+/* Rate Limiting */
 /* --------------------------------- */
 
 configureRateLimit({
- windowMs: 15 * 60 * 1000, // 15 minutes
- max: 100, // limit each API key/IP to 100 requests per window
+    windowMs: 15 * 60 * 1000,
+    max: 100,
 });
 
 app.use(rateLimitMiddleware);
 
 /* --------------------------------- */
-/* Auth Middleware */
+/* Authentication */
 /* --------------------------------- */
 
 app.use(authMiddleware);
@@ -88,11 +94,11 @@ app.use("/", openaiRoutes);
 /* --------------------------------- */
 
 app.get("/", (_, res) => {
- res.status(200).json({
- message: "🚀 Helix API is running",
- version: "1.0.0",
- status: "OK",
- });
+    res.status(200).json({
+        message: "🚀 Helix API is running",
+        version: "1.0.0",
+        status: "OK",
+    });
 });
 
 /* --------------------------------- */
@@ -100,50 +106,44 @@ app.get("/", (_, res) => {
 /* --------------------------------- */
 
 app.get("/health", (_, res) => {
- res.status(200).json({
- status: "healthy",
- uptime: process.uptime(),
- timestamp: new Date().toISOString(),
- environment: env.NODE_ENV,
- });
+    res.status(200).json({
+        status: "healthy",
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString(),
+        environment: env.NODE_ENV,
+    });
 });
 
 /* --------------------------------- */
-/* AI Test */
+/* AI Test (Development Only) */
 /* --------------------------------- */
 
-app.get("/api/test", async (_, res) => {
- try {
- const response = await smartRouter.route({
- prompt: `Write a production-ready TypeScript implementation of an LRU Cache.
+if (env.NODE_ENV !== "production") {
+    app.get("/api/test", async (_, res) => {
+        try {
+            const response = await smartRouter.route({
+                prompt: `Write a production-ready TypeScript implementation of an LRU Cache.
 Explain the algorithm, time complexity, and include unit tests.`,
- taskType: TaskType.CHAT,
- });
+                taskType: TaskType.CHAT,
+            });
 
- res.status(200).json(response);
+            res.status(200).json(response);
+        } catch (error) {
+            helixLogger.error("Failed to process AI test request", error);
 
- } catch (error) {
- console.error("========== API TEST ERROR ==========");
- console.error(error);
-
- if (error instanceof Error) {
- console.error(error.stack);
- }
-
- helixLogger.error("Failed to process AI request", error);
-
- res.status(500).json({
- error: "Failed to process AI request.",
- });
- }
-});
+            res.status(500).json({
+                error: "Failed to process AI request.",
+            });
+        }
+    });
+}
 
 /* --------------------------------- */
 /* Start Server */
 /* --------------------------------- */
 
 app.listen(env.PORT, () => {
- helixLogger.info(
- `🚀 Helix Server running on http://localhost:${env.PORT}`
- );
+    helixLogger.info(
+        `🚀 Helix Server running on http://localhost:${env.PORT}`
+    );
 });
