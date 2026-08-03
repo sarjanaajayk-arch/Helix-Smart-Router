@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Box, Text } from 'ink';
 
 import { NavigationManager } from './core/NavigationManager';
@@ -71,7 +71,7 @@ export const App: React.FC = () => {
     stateRef.current = state;
   }, [state]);
 
-  const { loadInitialData } = useBackend(setState);
+  const backend = useMemo(() => useBackend(setState), [setState]);
 
   const navigationManager = useRef(new NavigationManager()).current;
   const inputManager = useRef(new InputManager(navigationManager)).current;

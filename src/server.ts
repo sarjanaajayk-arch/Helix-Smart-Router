@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import { database } from "./database/Database";
 
 import { env } from "./config/env";
 import { helixLogger } from "./config/logger";
@@ -15,7 +16,10 @@ import streamRoutes from "./routes/streamRoutes";
 import openaiRoutes from "./routes/openai";
 import dashboardRoutes from "./routes/dashboardRoutes";
 import readyRoutes from "./routes/readyRoutes";
+import { createProviderCredentialsRoutes } from "./byok/routes/providerCredentialsRoutes";
+import { byokContainer } from "./integrations/byok/ByokContainer";
 
+import { ProviderCredentialsController } from "./byok/controllers/ProviderCredentialsController";
 import { requestIdMiddleware } from "./middlewares/requestIdMiddleware";
 import { requestLoggingMiddleware } from "./middlewares/requestLoggingMiddleware";
 import { authMiddleware, configureAuth } from "./middlewares/authMiddleware";
@@ -24,14 +28,31 @@ import {
     configureRateLimit,
 } from "./middlewares/rateLimitMiddleware";
 
-const app = express();
 
+const app = express();
+app.use((req, _res, next) => {
+    console.log("🔥 GLOBAL:", req.method, req.originalUrl);
+    next();
+});
 /* --------------------------------- */
 /* Core Services */
 /* --------------------------------- */
 
 const providerManager = new ProviderManager();
 const smartRouter = new SmartRouter(providerManager);
+/* --------------------------------- */
+/* BYOK Services */
+/* --------------------------------- */
+
+const providerCredentialsController =
+    new ProviderCredentialsController(
+        byokContainer.credentialsService
+    );
+
+const providerCredentialsRoutes =
+    createProviderCredentialsRoutes(
+        providerCredentialsController
+    );
 
 /* --------------------------------- */
 /* Health Monitor Initialization */
@@ -87,7 +108,18 @@ app.use("/metrics", metricsRoutes);
 app.use("/chat", streamRoutes);
 app.use("/dashboard", dashboardRoutes);
 app.use("/ready", readyRoutes);
+app.use((req, _res, next) => {
+    console.log("🔥 BEFORE OPENAI ROUTES:", req.method, req.originalUrl);
+    next();
+});
+
 app.use("/", openaiRoutes);
+
+app.use((req, _res, next) => {
+    console.log("🔥 AFTER OPENAI ROUTES:", req.method, req.originalUrl);
+    next();
+});
+app.use("/byok", providerCredentialsRoutes);
 
 /* --------------------------------- */
 /* Root */
@@ -137,13 +169,23 @@ Explain the algorithm, time complexity, and include unit tests.`,
         }
     });
 }
-
 /* --------------------------------- */
 /* Start Server */
 /* --------------------------------- */
 
-app.listen(env.PORT, () => {
-    helixLogger.info(
-        `🚀 Helix Server running on http://localhost:${env.PORT}`
-    );
-});
+database
+    .query("SELECT NOW()")
+    .then(() => {
+        helixLogger.info("✅ PostgreSQL connection verified");
+
+        app.listen(env.PORT, () => {
+            helixLogger.info(
+                `🚀 Helix Server running on http://localhost:${env.PORT}`
+            );
+        });
+    })
+    .catch((error) => {
+        console.error("❌ Failed to connect to PostgreSQL");
+        console.error(error);
+        process.exit(1);
+    });

@@ -1,3 +1,7 @@
+import { ModelRegistry } from "../orchestrator/ModelRegistry";
+import { byokContainer } from "../integrations/byok/ByokContainer";
+import { ProviderCredentialResolver } from "../integrations/byok/ProviderCredentialResolver";
+import { ProviderCredentialsService } from "../byok/services/ProviderCredentialsService";
 import { Request, Response } from "express";
 import { ProviderManager } from "../providers/ProviderManager";
 import { SmartRouter } from "../orchestrator/SmartRouter";
@@ -17,6 +21,10 @@ export class OpenAIController {
         req: Request,
         res: Response
     ): Promise<void> {
+        console.log("🔥 STEP 1 - Controller reached");
+        console.log("🔥 CONTROLLER REACHED");
+        console.log("🔥 STEP 1 - Controller entered");
+
         try {
             const openaiRequest: OpenAIChatRequest = req.body;
 
@@ -40,17 +48,59 @@ export class OpenAIController {
                 return;
             }
 
-            // Non-streaming path (existing logic)
+            // Non-streaming path
             const routingRequest: RoutingRequest =
                 OpenAIRequestConverter.toRoutingRequest(openaiRequest);
 
-            console.log(`[OpenAIController.chatCompletions] After converter, routingRequest.model: ${routingRequest.model}`);
+            console.log("🔥 BYOK CHECKPOINT 1");
 
-            const routingResponse: RoutingResponse = await smartRouter.route(
-                routingRequest
+            // ------------------------------------------------------------
+            // Temporary BYOK integration (development)
+            // ------------------------------------------------------------
+
+            const provider = ModelRegistry.getProvider(
+                routingRequest.model!
             );
 
-            console.log(`[OpenAIController.chatCompletions] After smartRouter.route, response.model: ${routingResponse.model}`);
+            if (provider !== undefined) {
+                const credential =
+                    await byokContainer.resolver.resolve(
+                        "test-user",
+                        provider!
+                    );
+
+                routingRequest.credentialContext = credential;
+
+                console.log("🔥 BYOK CHECKPOINT 2", credential);
+
+                console.log("[BYOK DEBUG]", {
+                    foundCredential: credential !== undefined,
+                    userId: "test-user",
+                    provider,
+                    routingCredential: routingRequest.credentialContext,
+                });
+            }
+
+            console.log(
+                "🔥 BYOK CHECKPOINT 3",
+                routingRequest.credentialContext
+            );
+
+            console.log(
+                `[OpenAIController.chatCompletions] After converter, routingRequest.model: ${routingRequest.model}`
+            );
+
+            const routingResponse: RoutingResponse =
+                await smartRouter.route(routingRequest);
+
+            console.log(
+                "🔥 BYOK CHECKPOINT 4",
+                routingRequest.credentialContext
+            );
+
+            console.log(
+                `[OpenAIController.chatCompletions] After smartRouter.route, response.model: ${routingResponse.model}`
+            );
 
             const openaiResponse: OpenAIChatResponse =
                 OpenAIResponseConverter.toOpenAIResponse(
@@ -58,22 +108,39 @@ export class OpenAIController {
                     openaiRequest.model
                 );
 
-            console.log(`[OpenAIController.chatCompletions] Final response model: ${openaiResponse.model}`);
+            console.log(
+                `[OpenAIController.chatCompletions] Final response model: ${openaiResponse.model}`
+            );
 
             res.status(200).json(openaiResponse);
-        } catch (error) {
-            console.error("OpenAI Chat Completions Error:", error);
+        } catch (error: any) {
+            console.error("========================================");
+            console.error("🔥 RAW CONTROLLER ERROR");
+            console.error(error);
 
             if (error instanceof Error) {
+                console.error("MESSAGE:", error.message);
+                console.error("STACK:");
                 console.error(error.stack);
             }
+
+            if (error?.response) {
+                console.error("HTTP STATUS:", error.response.status);
+                console.error("HTTP DATA:", error.response.data);
+            }
+
+            if (error?.cause) {
+                console.error("CAUSE:", error.cause);
+            }
+
+            console.error("========================================");
 
             res.status(500).json({
                 error: {
                     message:
                         error instanceof Error
                             ? error.message
-                            : "Internal server error",
+                            : String(error),
                     type: "internal_error",
                     code: "internal_error",
                 },
@@ -87,12 +154,29 @@ export class OpenAIController {
         openaiRequest: OpenAIChatRequest
     ): Promise<void> {
         console.log(`[OpenAIController.handleStreamingChatCompletions] Incoming openaiRequest.model: ${openaiRequest.model}`);
-        
+
         const routingRequest: RoutingRequest =
             OpenAIRequestConverter.toRoutingRequest(openaiRequest);
 
+        // ------------------------------------------------------------
+        // Temporary BYOK integration (development)
+        // ------------------------------------------------------------
+
+        const provider = ModelRegistry.getProvider(
+            routingRequest.model!
+        );
+
+        if (provider !== undefined) {
+            const credential =
+                await byokContainer.resolver.resolve(
+                    "test-user",
+                    provider
+                );
+
+            routingRequest.credentialContext = credential;
+        }
+
         console.log(`[OpenAIController.handleStreamingChatCompletions] After converter, routingRequest.model: ${routingRequest.model}`);
-        // Ensure stream flag is set (though conversion may already set it to false)
         routingRequest.stream = true;
 
         const stream = smartRouter.routeStream(routingRequest);
@@ -114,7 +198,6 @@ export class OpenAIController {
             console.log("[SSE] Client disconnected");
         });
 
-        // Generate a random ID and timestamp for the chat completion chunk
         const chunkId = `chatcmpl-${Date.now()}-${Math.random()
             .toString(36)
             .substring(2, 9)}`;
@@ -131,7 +214,6 @@ export class OpenAIController {
 
                 console.log("[SSE] Received chunk from SmartRouter, length:", chunk.length);
 
-                // Construct OpenAI-compatible chunk
                 const openaiChunk = {
                     id: chunkId,
                     object: "chat.completion.chunk",
@@ -153,7 +235,6 @@ export class OpenAIController {
             }
 
             if (!clientDisconnected) {
-                // Send final chunk with finish_reason
                 const finalChunk = {
                     id: chunkId,
                     object: "chat.completion.chunk",
@@ -170,7 +251,6 @@ export class OpenAIController {
 
                 console.log("[SSE] Writing final chunk");
                 res.write(`data: ${JSON.stringify(finalChunk)}\n\n`);
-                // Send the [DONE] marker
                 console.log("[SSE] Writing [DONE] marker");
                 res.write("data: [DONE]\n\n");
                 console.log("[SSE] Calling res.end()");
@@ -182,9 +262,6 @@ export class OpenAIController {
         } catch (error) {
             if (!clientDisconnected) {
                 console.error("[SSE] Streaming error:", error);
-                const errorMessage =
-                    error instanceof Error ? error.message : "Unknown streaming error";
-                // We'll just end with [DONE] on error as well
                 console.log("[SSE] Writing [DONE] on error");
                 res.write(`data: [DONE]\n\n`);
                 console.log("[SSE] Calling res.end() on error");
@@ -194,33 +271,51 @@ export class OpenAIController {
             }
         }
     }
-    static async listModels(req: Request, res: Response): Promise<void> {
-        try {
-            const allModelsByProvider = await providerManager.getAllModels();
-            const dataArray = [];
-            for (const [providerName, models] of Object.entries(allModelsByProvider)) {
-                for (const model of models) {
-                    dataArray.push({
-                        id: model.id,
-                        object: "model",
-                        created: Math.floor(Date.now() / 1000),
-                        owned_by: providerName,
-                    });
-                }
+static async listModels(req: Request, res: Response): Promise<void> {
+    try {
+        // ...
+        const allModelsByProvider = await providerManager.getAllModels();
+
+        console.log("========== AVAILABLE MODELS ==========");
+        console.dir(allModelsByProvider, { depth: null });
+        console.log("======================================");
+
+        const dataArray = [];
+
+        for (const [providerName, models] of Object.entries(allModelsByProvider)) {
+
+            console.log(
+                `Provider ${providerName}:`,
+                models.map(m => m.id)
+            );
+
+            for (const model of models) {
+                dataArray.push({
+                    id: model.id,
+                    object: "model",
+                    created: Math.floor(Date.now() / 1000),
+                    owned_by: providerName,
+                });
             }
-            res.status(200).json({
-                object: "list",
-                data: dataArray
-            });
-        } catch (error) {
-            console.error("OpenAI Models Error:", error);
-            res.status(500).json({
-                error: {
-                    message: error instanceof Error ? error.message : "Internal server error",
-                    type: "internal_error",
-                    code: "internal_error",
-                }
-            });
         }
+
+        res.status(200).json({
+            object: "list",
+            data: dataArray,
+        });
+
+    } catch (error: unknown) {
+        console.error("OpenAI Models Error:", error);
+
+        const message = error instanceof Error ? error.message : String(error) || "Internal server error";
+
+        res.status(500).json({
+            error: {
+                message,
+                type: "internal_error",
+                code: "internal_error",
+            },
+        });
     }
+}
 }

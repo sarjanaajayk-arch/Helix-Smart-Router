@@ -8,50 +8,90 @@ export class CapabilityFilter {
         taskType: TaskType
     ): ProviderCapabilities[] {
 
+        console.log("🔥 CapabilityFilter taskType =", taskType);
+        console.log(
+            "🔥 Providers =",
+            providers.map(p => ({
+                provider: p.provider,
+                enabled: p.enabled,
+                supportsChat: p.supportsChat
+            }))
+        );
+
         return providers.filter((provider) => {
+            console.log("🔥 Checking provider:", provider.provider);
+
+            console.log("[CapabilityFilter] Checking provider:", {
+                provider: provider.provider,
+                enabled: provider.enabled,
+                healthy: HealthMonitor.isHealthy(provider.provider),
+                supportsChat: provider.supportsChat,
+                supportsCoding: provider.supportsCoding,
+                supportsVision: provider.supportsVision,
+                supportsReasoning: provider.supportsReasoning,
+                taskType,
+            });
 
             if (!provider.enabled) {
+                console.log(`[CapabilityFilter] REJECT ${provider.provider}: disabled`);
                 return false;
             }
 
             if (!HealthMonitor.isHealthy(provider.provider)) {
+                console.log(`[CapabilityFilter] REJECT ${provider.provider}: unhealthy`);
                 return false;
             }
+
+            let supported = false;
 
             switch (taskType) {
 
                 case TaskType.CHAT:
-                    return provider.supportsChat;
+                    supported = provider.supportsChat;
+                    break;
 
                 case TaskType.CODE:
-                    return provider.supportsCoding;
+                    supported = provider.supportsCoding;
+                    break;
 
                 case TaskType.VISION:
-                    return provider.supportsVision;
+                    supported = provider.supportsVision;
+                    break;
 
                 case TaskType.REASONING:
-                    return provider.supportsReasoning;
+                    supported = provider.supportsReasoning;
+                    break;
 
                 case TaskType.SUMMARIZATION:
-                    return provider.supportsChat; // Summarization uses chat capability
+                    supported = provider.supportsChat;
+                    break;
 
                 case TaskType.TRANSLATION:
-                    return provider.supportsChat; // Translation uses chat capability
+                    supported = provider.supportsChat;
+                    break;
 
                 case TaskType.CLASSIFICATION:
-                    return provider.supportsChat; // Classification uses chat capability
+                    supported = provider.supportsChat;
+                    break;
 
                 case TaskType.SEARCH:
-                    return provider.supportsChat; // Search uses chat capability
+                    supported = provider.supportsChat;
+                    break;
 
                 case TaskType.AGENT:
-                    return provider.supportsChat; // Agent uses chat capability
+                    supported = provider.supportsChat;
+                    break;
 
                 default:
-                    return provider.supportsChat; // Default to chat capability
+                    supported = provider.supportsChat;
+                    break;
             }
 
-        });
+            console.log(
+                `[CapabilityFilter] ${provider.provider} supports ${taskType}: ${supported}`
+            );
 
+            return supported;
+        });
     }
 }

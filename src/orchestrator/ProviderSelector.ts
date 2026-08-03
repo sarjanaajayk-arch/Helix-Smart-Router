@@ -7,33 +7,42 @@ import { ProviderScorer } from "./ProviderScorer";
 export class ProviderSelector {
 
     public static select(
-        providers: ProviderCapabilities[],
-        taskType: TaskType
-    ): ProviderCapabilities {
+    providers: ProviderCapabilities[],
+    taskType: TaskType
+): ProviderCapabilities {
 
-        const availableProviders = CapabilityFilter.filter(
-            providers,
-            taskType
-        );
+    console.log("=================================");
+    console.log("ProviderSelector.select()");
+    console.log("TaskType:", taskType);
+    console.log("Providers:", providers);
 
-        if (availableProviders.length === 0) {
-            throw new Error("No compatible AI providers available.");
-        }
+    const availableProviders = CapabilityFilter.filter(
+        providers,
+        taskType
+    );
 
-        let bestProvider = availableProviders[0];
-        let bestScore = ProviderScorer.calculateScore(bestProvider);
+    console.log("Available Providers:", availableProviders);
 
-        for (const provider of availableProviders.slice(1)) {
-
-            const score = ProviderScorer.calculateScore(provider);
-
-            if (score > bestScore) {
-                bestScore = score;
-                bestProvider = provider;
-            }
-        }
-
-        return bestProvider;
+    if (availableProviders.length === 0) {
+        console.log("❌ ZERO PROVIDERS AFTER FILTER");
+        throw new Error("No compatible AI providers available.");
     }
 
+    let bestProvider = availableProviders[0];
+    let bestScore = ProviderScorer.calculateScore(bestProvider);
+
+    for (const provider of availableProviders.slice(1)) {
+
+        const score = ProviderScorer.calculateScore(provider);
+
+        if (score > bestScore) {
+            bestScore = score;
+            bestProvider = provider;
+        }
+    }
+
+    console.log("✅ Selected Provider:", bestProvider.provider);
+
+    return bestProvider;
+}
 }

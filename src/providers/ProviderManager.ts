@@ -1,14 +1,14 @@
 import { AIProvider, ChatMessage, ChatResponse, AIModelInfo, GenerationOptions } from "./AIProvider";
 import { GeminiProvider } from "./GeminiProvider";
 import { OpenRouterProvider } from "./OpenRouterProvider";
-
+import { ProviderCredentialContext } from "./credentials/ProviderCredentialContext";
 import { RetryEngine } from "../orchestrator/RetryEngine";
 import { FailoverEngine } from "../orchestrator/FailoverEngine";
 import { HealthMonitor } from "../orchestrator/HealthMonitor";
 import { TimeoutWrapper } from "../orchestrator/TimeoutWrapper";
 import { TimeoutConfig } from "../config/TimeoutConfig";
 import { TokenAccounting } from "../orchestrator/TokenAccounting";
-
+import { ProviderFactory } from "./factory/ProviderFactory";
 import { ProviderType } from "../types/ProviderType";
 import { ProviderCapabilities } from "../models/ProviderCapabilities";
 import { PROVIDERS } from "../orchestrator/ProviderRegistry";
@@ -227,93 +227,125 @@ export class ProviderManager {
     }
 
     private async executeWithMetrics(
-                providerName: string,
-                messages: ChatMessage[],
-                model: string = "unknown",
-                options?: GenerationOptions
-            ): Promise<ChatResponse> {
-                const provider = this.getProvider(providerName);
-                const startTime = Date.now();
-
-                // Try to get more specific model info if we have it
-                let modelInfo: string = model;
-                const providerModels = this.providerModels.get(providerName);
-                if (providerModels) {
-                    const modelObj = providerModels.find(m => m.id === model);
-                    if (modelObj) {
-                        modelInfo = `${modelObj.name} (${modelObj.id})`;
+        providerName: string,
+        messages: ChatMessage[],
+        model: string = "unknown",
+        options?: GenerationOptions,
+        credentialContext?: ProviderCredentialContext
+    ): Promise<ChatResponse> {
+        let provider: AIProvider & { getAvailableModels: () => Promise<AIModelInfo[]> };
+                if (credentialContext) {
+                    // Check if the credential's provider matches the selected provider
+                    if (credentialContext.provider === providerName) {
+                        provider = ProviderFactory.create(credentialContext);
+                    } else {
+                        helixLogger.warn(
+                            `Credential provider mismatch: credential provider is ${credentialContext.provider}, but selected provider is ${providerName}. Ignoring credential and using cached provider for ${providerName}.`,
+                            { credentialProvider: credentialContext.provider, selectedProvider: providerName }
+                        );
+                        provider = this.getProvider(providerName);
                     }
+                } else {
+                    provider = this.getProvider(providerName);
                 }
+        const startTime = Date.now();
 
-                MetricsManager.recordRequest();
+        // Try to get more specific model info if we have it
+        let modelInfo: string = model;
+        const providerModels = this.providerModels.get(providerName);
+        if (providerModels) {
+            const modelObj = providerModels.find(m => m.id === model);
+            if (modelObj) {
+                modelInfo = `${modelObj.name} (${modelObj.id})`;
+            }
+        }
 
-                helixLogger.info("Provider Selected", {
-                    provider: providerName,
-                    model: modelInfo,
-                    stream: false
-                });
+        MetricsManager.recordRequest();
 
-                // Log the payload being sent to the provider
-                helixLogger.info("Provider Request Payload", {
-                    provider: providerName,
-                    model: modelInfo,
-                    messages: messages,
-                    options: options
-                });
+        helixLogger.info("Provider Selected", {
+            provider: providerName,
+            model: modelInfo,
+            stream: false
+        });
 
-                try {
-                    const response = await RetryEngine.execute(() =>
-                        TimeoutWrapper.withTimeout(
-                            provider.chat(messages, model, options),
-                            TimeoutConfig.providerTimeoutMs,
-                            `${providerName} chat`
-                        )
-                    );
+        // Log the payload being sent to the provider
+        helixLogger.info("Provider Request Payload", {
+            provider: providerName,
+            model: modelInfo,
+            messages: messages,
+            options: options
+        });
 
-                    // Validate provider response
-                    const validation = OutputValidator.validateChatResponse(response, providerName, messages);
-                    if (!validation.valid) {
-                        throw new Error(validation.error ?? "Provider response validation failed");
-                    }
+        try {
+            console.log("🔥 EXECUTE WITH METRICS", {
+                usingBYOK: credentialContext !== undefined,
+                providerName,
+                model,
+                apiKeyPrefix: credentialContext?.apiKey?.substring(0, 10),
+            });
 
-                    const latency = Date.now() - startTime;
+            const response = await RetryEngine.execute(() =>
+                TimeoutWrapper.withTimeout(
+                    provider.chat(messages, model, options),
+                    TimeoutConfig.providerTimeoutMs,
+                    `${providerName} chat`
+                )
+            );
 
-                    // Estimate token usage for accounting
-                    const promptText = messages.map(m => m.content).join("\n");
-                    const promptTokens = TokenAccounting.estimateTokens(promptText);
-                    const completionTokens = TokenAccounting.estimateTokens(response.content);
-                    TokenAccounting.recordUsage(providerName as ProviderType, promptTokens, completionTokens);
-
-                    HealthMonitor.recordSuccess(providerName as ProviderType);
-                    MetricsManager.recordSuccess(providerName as ProviderType, latency);
-
-                    return validation.sanitizedResponse!;
-                } catch (error) {
-                    const latency = Date.now() - startTime;
-
-                    HealthMonitor.recordFailure(providerName as ProviderType);
-                    MetricsManager.recordFailure(providerName as ProviderType, latency);
-
-                    throw error;
-                }
+            // Validate provider response
+            const validation = OutputValidator.validateChatResponse(response, providerName, messages);
+            if (!validation.valid) {
+                throw new Error(validation.error ?? "Provider response validation failed");
             }
 
+            const latency = Date.now() - startTime;
+
+            // Estimate token usage for accounting
+            const promptText = messages.map(m => m.content).join("\n");
+            const promptTokens = TokenAccounting.estimateTokens(promptText);
+            const completionTokens = TokenAccounting.estimateTokens(response.content);
+            TokenAccounting.recordUsage(providerName as ProviderType, promptTokens, completionTokens);
+
+            HealthMonitor.recordSuccess(providerName as ProviderType);
+            MetricsManager.recordSuccess(providerName as ProviderType, latency);
+
+            return validation.sanitizedResponse!;
+        } catch (error) {
+            const latency = Date.now() - startTime;
+
+            HealthMonitor.recordFailure(providerName as ProviderType);
+            MetricsManager.recordFailure(providerName as ProviderType, latency);
+
+            throw error;
+        }
+    }
+
     async executeChat(
-            providerName: string,
-            messages: ChatMessage[],
-            model: string = "unknown",
-            options?: GenerationOptions
-        ): Promise<ChatResponse> {
-            console.log(`[ProviderManager.executeChat] Called with: providerName=${providerName}, model=${model}, messagesCount=${messages.length}`);
-        
-            try {
-                return await this.executeWithMetrics(
-                    providerName,
-                    messages,
-                    model,
-                    options
-                );
-            } catch (error) {
+        providerName: string,
+        messages: ChatMessage[],
+        model: string = "unknown",
+        options?: GenerationOptions,
+        credentialContext?: ProviderCredentialContext
+    ): Promise<ChatResponse> {
+        console.log("🔥 PROVIDER MANAGER ENTER");
+        console.log({
+            providerName,
+            model,
+            credentialContext,
+        });
+
+        console.log(`[ProviderManager.executeChat] Called with: providerName=${providerName}, model=${model}, messagesCount=${messages.length}`);
+
+        try {
+            console.log("🔥 CALLING executeWithMetrics");
+            return await this.executeWithMetrics(
+                providerName,
+                messages,
+                model,
+                options,
+                credentialContext
+            );
+        } catch (error) {
             // Get the list of providers that we have initialized (and are in the PROVIDERS registry)
             const availableProviders = PROVIDERS.filter(p =>
                 this.providers.has(p.provider)
@@ -368,59 +400,80 @@ export class ProviderManager {
             });
 
             return await this.executeWithMetrics(
-                            nextProviderName,
-                            messages,
-                            fallbackModel,
-                            options
-                        );
+                nextProviderName,
+                messages,
+                fallbackModel,
+                options,
+                credentialContext
+            );
         }
     }
 
     async *executeChatStream(
-                providerName: string,
-                messages: ChatMessage[],
-                model: string = "unknown",
-                options?: GenerationOptions
-            ): AsyncGenerator<string> {
-                console.log(`[ProviderManager.executeChatStream] Called with: providerName=${providerName}, model=${model}, messagesCount=${messages.length}`);
-        
-                const provider = this.getProvider(providerName);
-            const startTime = Date.now();
+        providerName: string,
+        messages: ChatMessage[],
+        model: string = "unknown",
+        options?: GenerationOptions,
+        credentialContext?: ProviderCredentialContext
+    ): AsyncGenerator<string> {
+        console.log(`[ProviderManager.executeChatStream] Called with: providerName=${providerName}, model=${model}, messagesCount=${messages.length}`);
 
-            // Try to get more specific model info if we have it
-            let modelInfo: string = model;
-            const providerModels = this.providerModels.get(providerName);
-            if (providerModels) {
-                const modelObj = providerModels.find(m => m.id === model);
-                if (modelObj) {
-                    modelInfo = `${modelObj.name} (${modelObj.id})`;
+        let provider: AIProvider & { getAvailableModels: () => Promise<AIModelInfo[]> };
+                if (credentialContext) {
+                    // Check if the credential's provider matches the selected provider
+                    if (credentialContext.provider === providerName) {
+                        provider = ProviderFactory.create(credentialContext);
+                    } else {
+                        helixLogger.warn(
+                            `Credential provider mismatch: credential provider is ${credentialContext.provider}, but selected provider is ${providerName}. Ignoring credential and using cached provider for ${providerName}.`,
+                            { credentialProvider: credentialContext.provider, selectedProvider: providerName }
+                        );
+                        provider = this.getProvider(providerName);
+                    }
+                } else {
+                    provider = this.getProvider(providerName);
                 }
-            }
+        console.log("[BYOK] Runtime credential:", {
+            usingBYOK: credentialContext !== undefined,
+            provider: providerName,
+            userId: credentialContext?.userId
+        });
+        const startTime = Date.now();
 
-            if (typeof provider.generateStream !== "function") {
-                throw new Error(
-                    `Provider '${providerName}' does not support streaming.`
-                );
-            }
-
-            try {
-                console.log("[ProviderManager] Starting to iterate provider.generateStream");
-                for await (const chunk of provider.generateStream(messages, model, options)) {
-                    console.log("[ProviderManager] Received chunk from provider, length:", chunk.length);
-                    yield chunk;
-                }
-                console.log("[ProviderManager] Stream iteration complete");
-
-                const latency = Date.now() - startTime;
-
-                HealthMonitor.recordSuccess(providerName as ProviderType);
-                MetricsManager.recordSuccess(providerName as ProviderType, latency);
-            } catch (error) {
-                const latency = Date.now() - startTime;
-
-                HealthMonitor.recordFailure(providerName as ProviderType);
-                MetricsManager.recordFailure(providerName as ProviderType, latency);
-                throw error;
+        // Try to get more specific model info if we have it
+        let modelInfo: string = model;
+        const providerModels = this.providerModels.get(providerName);
+        if (providerModels) {
+            const modelObj = providerModels.find(m => m.id === model);
+            if (modelObj) {
+                modelInfo = `${modelObj.name} (${modelObj.id})`;
             }
         }
+
+        if (typeof provider.generateStream !== "function") {
+            throw new Error(
+                `Provider '${providerName}' does not support streaming.`
+            );
+        }
+
+        try {
+            console.log("[ProviderManager] Starting to iterate provider.generateStream");
+            for await (const chunk of provider.generateStream(messages, model, options)) {
+                console.log("[ProviderManager] Received chunk from provider, length:", chunk.length);
+                yield chunk;
+            }
+            console.log("[ProviderManager] Stream iteration complete");
+
+            const latency = Date.now() - startTime;
+
+            HealthMonitor.recordSuccess(providerName as ProviderType);
+            MetricsManager.recordSuccess(providerName as ProviderType, latency);
+        } catch (error) {
+            const latency = Date.now() - startTime;
+
+            HealthMonitor.recordFailure(providerName as ProviderType);
+            MetricsManager.recordFailure(providerName as ProviderType, latency);
+            throw error;
+        }
     }
+}

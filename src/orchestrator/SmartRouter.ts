@@ -47,7 +47,7 @@ export class SmartRouter {
     /**
      * Selects the provider for a request.
      */
-    private selectProvider(
+    public selectProvider(
         request: RoutingRequest
     ): ProviderType {
         console.log(`[SmartRouter] selectProvider: taskType=${request.taskType}, model=${request.model}`);
@@ -129,11 +129,20 @@ export class SmartRouter {
     async route(
         request: RoutingRequest
     ): Promise<RoutingResponse> {
+
+        console.log("🔥 SMART ROUTER RECEIVED", {
+            model: request.model,
+            taskType: request.taskType,
+            credentialContext: request.credentialContext,
+        });
+
         const context: RoutingContext = {
             request,
         };
 
-        console.log(`[SmartRouter.route] Incoming request.model: ${request.model}`);
+        console.log(
+            `[SmartRouter.route] Incoming request.model: ${request.model}`
+        );
 
         context.provider = this.selectProvider(request);
 
@@ -163,14 +172,27 @@ export class SmartRouter {
             undefined
         );
 
-        console.log(`[SmartRouter] maxTokens before normalization: ${request.maxTokens}`);
-        console.log(`[SmartRouter] maxTokens after normalization: ${normalizedMaxTokens}`);
+        console.log(
+            `[SmartRouter] maxTokens before normalization: ${request.maxTokens}`
+        );
+
+        console.log(
+            `[SmartRouter] maxTokens after normalization: ${normalizedMaxTokens}`
+        );
 
         const startTime = Date.now();
+
         let response: any;
         let error: Error | null = null;
 
         try {
+
+            console.log("🔥 SMART ROUTER SENDING", {
+                provider: context.provider,
+                model: context.selectedModel,
+                credentialContext: request.credentialContext,
+            });
+
             response = await RetryEngine.execute(() =>
                 TimeoutWrapper.withTimeout(
                     this.providerManager.executeChat(
@@ -180,21 +202,33 @@ export class SmartRouter {
                         {
                             maxTokens: normalizedMaxTokens,
                             temperature: request.temperature,
-                        }
+                        },
+                        request.credentialContext
                     ),
                     TimeoutConfig.providerTimeoutMs,
                     "Provider Chat Request"
                 )
             );
+
         } catch (err) {
-            error = err instanceof Error ? err : new Error(String(err));
+
+            error =
+                err instanceof Error
+                    ? err
+                    : new Error(String(err));
+
             throw error;
+
         } finally {
+
             const latencyMs = Date.now() - startTime;
-            const apiKeyId = request.apiKeyId || "unknown";
+
+            const apiKeyId =
+                request.apiKeyId || "unknown";
 
             usageMeter.recordRequestUsage({
-                requestId: request.requestId || `req-${Date.now()}`,
+                requestId:
+                    request.requestId || `req-${Date.now()}`,
                 apiKeyId,
                 provider: context.provider!,
                 model: context.selectedModel!,
@@ -205,6 +239,12 @@ export class SmartRouter {
                 errorMessage: error?.message,
             });
         }
+
+        console.log("🔥 SMART ROUTER RECEIVED RESPONSE", {
+            provider: response.provider,
+            model: response.model,
+            contentLength: response.content?.length ?? 0,
+        });
 
         return {
             content: response.content,
@@ -266,7 +306,8 @@ export class SmartRouter {
                     {
                         maxTokens: normalizedMaxTokens,
                         temperature: request.temperature,
-                    }
+                    },
+                    request.credentialContext
                 ),
                 TimeoutConfig.streamingTimeoutMs,
                 "Provider Streaming Request"
@@ -280,6 +321,7 @@ export class SmartRouter {
             error = err instanceof Error ? err : new Error(String(err));
             throw error;
         } finally {
+
             const latencyMs = Date.now() - startTime;
             const apiKeyId = request.apiKeyId || "unknown";
 

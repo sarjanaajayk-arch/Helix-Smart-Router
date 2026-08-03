@@ -8,8 +8,8 @@ export const MODEL_REGISTRY: AIModel[] = [
     ============================================================ */
 
     {
-        id: "gemini-2.5-flash-lite",
-        name: "Gemini 2.5 Flash Lite",
+        id: "gemini-2.5-flash",
+        name: "Gemini 2.5 Flash",
 
         provider: ProviderType.GEMINI,
 
