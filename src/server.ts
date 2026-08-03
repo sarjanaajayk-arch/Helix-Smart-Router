@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import { database } from "./database/Database";
-
+import authRoutes from "./auth/routes/AuthRoutes";
 import { env } from "./config/env";
 import { helixLogger } from "./config/logger";
 
@@ -79,6 +79,7 @@ configureAuth({
 
 app.use(cors());
 app.use(express.json());
+app.use("/auth", authRoutes);
 
 app.use(requestIdMiddleware);
 app.use(requestLoggingMiddleware);
