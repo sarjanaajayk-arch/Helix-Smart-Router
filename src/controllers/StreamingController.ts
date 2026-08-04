@@ -1,10 +1,10 @@
 import { Request, Response } from "express";
-import { ProviderManager } from "../providers/ProviderManager";
 
-const providerManager = new ProviderManager();
-import { SmartRouter } from "../orchestrator/SmartRouter";
+
+
+
 import { TaskType } from "../types/TaskType";
-
+import { smartRouter } from "../container/AppContainer";
 export class StreamingController {
   static async stream(
     req: Request,
@@ -14,7 +14,7 @@ export class StreamingController {
       (req.query.prompt as string) ??
       "Hello from Helix";
 
-    const smartRouter = new SmartRouter(providerManager);
+   
 
     res.status(200);
 

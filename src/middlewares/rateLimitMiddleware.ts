@@ -37,8 +37,8 @@ function cleanupExpiredEntries(): void {
   }
 }
 
+// Retain timer reference in the event loop; do not call unref()
 const cleanupTimer = setInterval(cleanupExpiredEntries, 60 * 1000);
-cleanupTimer.unref();
 
 export function configureRateLimit(
   config: Partial<RateLimitConfig>
@@ -170,15 +170,13 @@ export function rateLimitMiddleware(
   next();
 }
 
-process.on("SIGTERM", () => {
-  cleanupTimer.close();
+const handleShutdown = () => {
+  clearInterval(cleanupTimer);
   rateLimitStore.clear();
-});
+};
 
-process.on("SIGINT", () => {
-  cleanupTimer.close();
-  rateLimitStore.clear();
-});
+process.on("SIGTERM", handleShutdown);
+process.on("SIGINT", handleShutdown);
 
 declare global {
   namespace Express {
@@ -188,6 +186,8 @@ declare global {
         remaining: number;
         reset: number;
       };
+      apiKey?: string;
+      requestId: string;
     }
   }
 }

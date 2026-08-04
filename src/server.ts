@@ -4,9 +4,11 @@ import { database } from "./database/Database";
 import authRoutes from "./auth/routes/AuthRoutes";
 import { env } from "./config/env";
 import { helixLogger } from "./config/logger";
-
-import { ProviderManager } from "./providers/ProviderManager";
-import { SmartRouter } from "./orchestrator/SmartRouter";
+import organizationRoutes from "./organizations/routes/OrganizationRoutes";
+import {
+    providerManager,
+    smartRouter,
+} from "./container/AppContainer";
 import { TaskType } from "./types/TaskType";
 import { PROVIDERS } from "./orchestrator/ProviderRegistry";
 import { HealthMonitor } from "./orchestrator/HealthMonitor";
@@ -31,15 +33,14 @@ import {
 
 const app = express();
 app.use((req, _res, next) => {
-    console.log("🔥 GLOBAL:", req.method, req.originalUrl);
+    
     next();
 });
 /* --------------------------------- */
 /* Core Services */
 /* --------------------------------- */
 
-const providerManager = new ProviderManager();
-const smartRouter = new SmartRouter(providerManager);
+
 /* --------------------------------- */
 /* BYOK Services */
 /* --------------------------------- */
@@ -80,6 +81,10 @@ configureAuth({
 app.use(cors());
 app.use(express.json());
 app.use("/auth", authRoutes);
+app.use("/organizations", organizationRoutes);
+
+
+console.log("✅ Organizations route mounted");
 
 app.use(requestIdMiddleware);
 app.use(requestLoggingMiddleware);
@@ -109,18 +114,13 @@ app.use("/metrics", metricsRoutes);
 app.use("/chat", streamRoutes);
 app.use("/dashboard", dashboardRoutes);
 app.use("/ready", readyRoutes);
-app.use((req, _res, next) => {
-    console.log("🔥 BEFORE OPENAI ROUTES:", req.method, req.originalUrl);
-    next();
-});
+
 
 app.use("/", openaiRoutes);
 
-app.use((req, _res, next) => {
-    console.log("🔥 AFTER OPENAI ROUTES:", req.method, req.originalUrl);
-    next();
-});
+
 app.use("/byok", providerCredentialsRoutes);
+
 
 /* --------------------------------- */
 /* Root */
@@ -129,6 +129,7 @@ app.use("/byok", providerCredentialsRoutes);
 app.get("/", (_, res) => {
     res.status(200).json({
         message: "🚀 Helix API is running",
+
         version: "1.0.0",
         status: "OK",
     });
@@ -174,19 +175,34 @@ Explain the algorithm, time complexity, and include unit tests.`,
 /* Start Server */
 /* --------------------------------- */
 
-database
-    .query("SELECT NOW()")
-    .then(() => {
+let server: ReturnType<typeof app.listen>;
+
+async function startServer(): Promise<void> {
+    try {
+        await database.query("SELECT NOW()");
         helixLogger.info("✅ PostgreSQL connection verified");
 
-        app.listen(env.PORT, () => {
+        server = app.listen(env.PORT, () => {
             helixLogger.info(
                 `🚀 Helix Server running on http://localhost:${env.PORT}`
             );
         });
-    })
-    .catch((error) => {
+
+        
+
+        server.on("close", () => {
+            console.log("❌ SERVER CLOSED");
+        });
+
+    } catch (error) {
         console.error("❌ Failed to connect to PostgreSQL");
         console.error(error);
         process.exit(1);
-    });
+    }
+}
+
+
+
+
+
+startServer();

@@ -13,8 +13,10 @@ import { OpenAIChatResponse } from "../models/OpenAIChatResponse";
 import { RoutingRequest } from "../models/RoutingRequest";
 import { RoutingResponse } from "../models/RoutingResponse";
 
-const providerManager = new ProviderManager();
-const smartRouter = new SmartRouter(providerManager);
+import {
+    providerManager,
+    smartRouter,
+} from "../container/AppContainer";
 
 export class OpenAIController {
     static async chatCompletions(
