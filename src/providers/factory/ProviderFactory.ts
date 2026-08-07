@@ -9,9 +9,10 @@ export class ProviderFactory {
         credential: ProviderCredentialContext
     ): AIProvider {
 
+        // Log provider and a safe prefix of the API key. Avoid accessing
+        // properties not defined on ProviderCredentialContext (e.g. userId).
         console.log("🔥 PROVIDER FACTORY", {
             provider: credential.provider,
-            userId: credential.userId,
             apiKeyPrefix: credential.apiKey?.substring(0, 10),
         });
 

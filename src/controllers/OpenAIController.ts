@@ -53,6 +53,9 @@ export class OpenAIController {
             // Non-streaming path
             const routingRequest: RoutingRequest =
                 OpenAIRequestConverter.toRoutingRequest(openaiRequest);
+            
+            // Attach API key ID for downstream usage tracking & database logging
+            routingRequest.apiKeyId = req.apiKeyRecord!.id;
 
             console.log("🔥 BYOK CHECKPOINT 1");
 
@@ -159,6 +162,9 @@ export class OpenAIController {
 
         const routingRequest: RoutingRequest =
             OpenAIRequestConverter.toRoutingRequest(openaiRequest);
+        
+        // Attach API key ID for downstream usage tracking & database logging
+        routingRequest.apiKeyId = req.apiKeyRecord!.id;
 
         // ------------------------------------------------------------
         // Temporary BYOK integration (development)
@@ -273,51 +279,51 @@ export class OpenAIController {
             }
         }
     }
-static async listModels(req: Request, res: Response): Promise<void> {
-    try {
-        // ...
-        const allModelsByProvider = await providerManager.getAllModels();
 
-        console.log("========== AVAILABLE MODELS ==========");
-        console.dir(allModelsByProvider, { depth: null });
-        console.log("======================================");
+    static async listModels(req: Request, res: Response): Promise<void> {
+        try {
+            const allModelsByProvider = await providerManager.getAllModels();
 
-        const dataArray = [];
+            console.log("========== AVAILABLE MODELS ==========");
+            console.dir(allModelsByProvider, { depth: null });
+            console.log("======================================");
 
-        for (const [providerName, models] of Object.entries(allModelsByProvider)) {
+            const dataArray = [];
 
-            console.log(
-                `Provider ${providerName}:`,
-                models.map(m => m.id)
-            );
+            for (const [providerName, models] of Object.entries(allModelsByProvider)) {
 
-            for (const model of models) {
-                dataArray.push({
-                    id: model.id,
-                    object: "model",
-                    created: Math.floor(Date.now() / 1000),
-                    owned_by: providerName,
-                });
+                console.log(
+                    `Provider ${providerName}:`,
+                    models.map(m => m.id)
+                );
+
+                for (const model of models) {
+                    dataArray.push({
+                        id: model.id,
+                        object: "model",
+                        created: Math.floor(Date.now() / 1000),
+                        owned_by: providerName,
+                    });
+                }
             }
+
+            res.status(200).json({
+                object: "list",
+                data: dataArray,
+            });
+
+        } catch (error: unknown) {
+            console.error("OpenAI Models Error:", error);
+
+            const message = error instanceof Error ? error.message : String(error) || "Internal server error";
+
+            res.status(500).json({
+                error: {
+                    message,
+                    type: "internal_error",
+                    code: "internal_error",
+                },
+            });
         }
-
-        res.status(200).json({
-            object: "list",
-            data: dataArray,
-        });
-
-    } catch (error: unknown) {
-        console.error("OpenAI Models Error:", error);
-
-        const message = error instanceof Error ? error.message : String(error) || "Internal server error";
-
-        res.status(500).json({
-            error: {
-                message,
-                type: "internal_error",
-                code: "internal_error",
-            },
-        });
     }
-}
 }

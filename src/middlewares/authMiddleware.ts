@@ -1,6 +1,10 @@
 import { Request, Response, NextFunction } from "express";
-import { timingSafeEqual } from "crypto";
+import { createHash } from "crypto";
 import { helixLogger } from "../config/logger";
+import { database } from "../database/Database";
+import { PostgreSQLApiKeyRepository } from "../apiKeys/repositories/PostgreSQLApiKeyRepository";
+
+const apiKeyRepository = new PostgreSQLApiKeyRepository(database);
 
 export interface AuthConfig {
   apiKeys: string[];
@@ -58,30 +62,18 @@ function extractApiKey(req: Request): string | undefined {
   return undefined;
 }
 
-function isValidApiKey(apiKey: string): boolean {
-  return authConfig.apiKeys.some((validKey) => {
-    const provided = Buffer.from(apiKey);
-    const expected = Buffer.from(validKey);
-
-    if (provided.length !== expected.length) {
-      return false;
-    }
-
-    return timingSafeEqual(provided, expected);
-  });
+/**
+ * Generates a standard SHA-256 hex hash from the raw API key
+ */
+function hashApiKey(apiKey: string): string {
+  return createHash("sha256").update(apiKey).digest("hex");
 }
 
-export function authMiddleware(
+export async function authMiddleware(
   req: Request,
   res: Response,
   next: NextFunction
-): void {
-  if (authConfig.apiKeys.length === 0) {
-    helixLogger.warn("Auth middleware active but no API keys configured");
-    next();
-    return;
-  }
-
+): Promise<void> {
   const apiKey = extractApiKey(req);
 
   if (!apiKey) {
@@ -102,55 +94,81 @@ export function authMiddleware(
     return;
   }
 
-  if (!isValidApiKey(apiKey)) {
-    helixLogger.warn("Authentication failed: Invalid API key", {
+  try {
+    const keyHash = hashApiKey(apiKey);
+    const apiKeyRecord = await apiKeyRepository.findByKeyHash(keyHash);
+
+    if (!apiKeyRecord || !apiKeyRecord.isActive) {
+      helixLogger.warn("Authentication failed: Invalid or inactive API key", {
+        requestId: req.requestId,
+        path: req.originalUrl,
+        method: req.method,
+        keyPrefix: `${apiKey.slice(0, 8)}...`,
+      });
+
+      res.status(401).json({
+        error: {
+          message: "Invalid API key",
+          type: "authentication_error",
+          code: "invalid_api_key",
+        },
+      });
+
+      return;
+    }
+
+    req.apiKey = apiKey;
+
+    helixLogger.debug("Authentication successful", {
       requestId: req.requestId,
       path: req.originalUrl,
-      method: req.method,
       keyPrefix: `${apiKey.slice(0, 8)}...`,
     });
 
-    res.status(401).json({
-      error: {
-        message: "Invalid API key",
-        type: "authentication_error",
-        code: "invalid_api_key",
-      },
+    next();
+  } catch (error) {
+    helixLogger.error("Authentication error during DB lookup", {
+      error,
+      requestId: req.requestId,
+      path: req.originalUrl,
     });
 
-    return;
+    res.status(500).json({
+      error: {
+        message: "Internal server error during authentication",
+        type: "api_error",
+        code: "auth_internal_error",
+      },
+    });
   }
-
-  req.apiKey = apiKey;
-
-  helixLogger.debug("Authentication successful", {
-    requestId: req.requestId,
-    path: req.originalUrl,
-    keyPrefix: `${apiKey.slice(0, 8)}...`,
-  });
-
-  next();
 }
 
-export function optionalAuthMiddleware(
+export async function optionalAuthMiddleware(
   req: Request,
   res: Response,
   next: NextFunction
-): void {
-  if (authConfig.apiKeys.length === 0) {
-    next();
-    return;
-  }
-
+): Promise<void> {
   const apiKey = extractApiKey(req);
 
-  if (apiKey && isValidApiKey(apiKey)) {
-    req.apiKey = apiKey;
+  if (apiKey) {
+    try {
+      const keyHash = hashApiKey(apiKey);
+      const apiKeyRecord = await apiKeyRepository.findByKeyHash(keyHash);
 
-    helixLogger.debug("Optional authentication successful", {
-      requestId: req.requestId,
-      keyPrefix: `${apiKey.slice(0, 8)}...`,
-    });
+      if (apiKeyRecord && apiKeyRecord.isActive) {
+        req.apiKey = apiKey;
+
+        helixLogger.debug("Optional authentication successful", {
+          requestId: req.requestId,
+          keyPrefix: `${apiKey.slice(0, 8)}...`,
+        });
+      }
+    } catch (error) {
+      helixLogger.warn("Optional authentication check failed in DB", {
+        error,
+        requestId: req.requestId,
+      });
+    }
   }
 
   next();

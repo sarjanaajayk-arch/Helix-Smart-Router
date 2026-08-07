@@ -3,18 +3,19 @@ import { ProviderCredentialContext } from "../../providers/credentials/ProviderC
 import { ProviderType } from "../../types/ProviderType";
 
 export class ProviderCredentialResolver {
+
     constructor(
         private readonly credentialsService: ProviderCredentialsService
     ) {}
 
     async resolve(
-        userId: string,
+        organizationId: string,
         provider: ProviderType
     ): Promise<ProviderCredentialContext | undefined> {
 
         const credential =
             await this.credentialsService.getActiveCredential(
-                userId,
+                organizationId,
                 provider
             );
 
@@ -23,7 +24,7 @@ export class ProviderCredentialResolver {
         }
 
         return {
-            userId,
+            organizationId,
             provider,
             apiKey: credential.credential,
         };

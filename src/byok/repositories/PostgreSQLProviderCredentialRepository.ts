@@ -16,7 +16,7 @@ export class PostgreSQLProviderCredentialRepository {
 
         return {
             id: row.id,
-            userId: row.user_id,
+            organizationId: row.organization_id,
             provider: row.provider,
             authType: row.auth_type,
             displayName: row.display_name,
@@ -52,7 +52,7 @@ export class PostgreSQLProviderCredentialRepository {
             INSERT INTO provider_credentials
             (
                 id,
-                user_id,
+                organization_id,
                 provider,
                 auth_type,
                 display_name,
@@ -72,7 +72,7 @@ export class PostgreSQLProviderCredentialRepository {
             `,
             [
                 id,
-                credential.userId,
+                credential.organizationId,
                 credential.provider,
                 credential.authType,
                 credential.displayName,
@@ -110,26 +110,26 @@ export class PostgreSQLProviderCredentialRepository {
         return this.mapRowToModel(result.rows[0]);
     }
 
-    public async findByUserId(
-        userId: string
+    public async findByOrganizationId(
+        organizationId: string
     ): Promise<ProviderCredentialModel[]> {
 
         const result = await database.query(
             `
             SELECT *
             FROM provider_credentials
-            WHERE user_id = $1
+            WHERE organization_id = $1
             AND deleted = FALSE
             ORDER BY created_at DESC
             `,
-            [userId]
+            [organizationId]
         );
 
         return result.rows.map(row => this.mapRowToModel(row));
     }
 
     public async findByProvider(
-        userId: string,
+        organizationId: string,
         provider: ProviderType
     ): Promise<ProviderCredentialModel[]> {
 
@@ -137,13 +137,13 @@ export class PostgreSQLProviderCredentialRepository {
             `
             SELECT *
             FROM provider_credentials
-            WHERE user_id = $1
+            WHERE organization_id = $1
             AND provider = $2
             AND deleted = FALSE
             ORDER BY created_at DESC
             `,
             [
-                userId,
+                organizationId,
                 provider,
             ]
         );
@@ -173,7 +173,7 @@ export class PostgreSQLProviderCredentialRepository {
             `
             UPDATE provider_credentials
             SET
-                user_id = $2,
+                organization_id = $2,
                 provider = $3,
                 auth_type = $4,
                 display_name = $5,
@@ -191,7 +191,7 @@ export class PostgreSQLProviderCredentialRepository {
             `,
             [
                 id,
-                updated.userId,
+                updated.organizationId,
                 updated.provider,
                 updated.authType,
                 updated.displayName,
@@ -241,7 +241,7 @@ export class PostgreSQLProviderCredentialRepository {
     }
 
     public async exists(
-        userId: string,
+    organizationId: string,
         provider: ProviderType,
         displayName: string
     ): Promise<boolean> {
@@ -251,14 +251,14 @@ export class PostgreSQLProviderCredentialRepository {
             SELECT 1
             FROM provider_credentials
             WHERE
-                user_id = $1
+                organization_id = $1
                 AND provider = $2
                 AND display_name = $3
                 AND deleted = FALSE
             LIMIT 1
             `,
             [
-                userId,
+    organizationId,
                 provider,
                 displayName,
             ]

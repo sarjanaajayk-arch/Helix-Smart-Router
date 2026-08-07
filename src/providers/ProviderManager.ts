@@ -436,7 +436,7 @@ export class ProviderManager {
         console.log("[BYOK] Runtime credential:", {
             usingBYOK: credentialContext !== undefined,
             provider: providerName,
-            userId: credentialContext?.userId
+            credentialProvider: credentialContext?.provider
         });
         const startTime = Date.now();
 

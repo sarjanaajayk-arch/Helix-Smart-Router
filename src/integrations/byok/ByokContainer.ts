@@ -11,7 +11,7 @@ const encryptionSecret =
     process.env.HELIX_ENCRYPTION_SECRET ??
     "helix-development-secret";
 
-const repository = new PostgreSQLProviderCredentialRepository();
+const repository: ProviderCredentialRepository = new PostgreSQLProviderCredentialRepository();
 
 const encryptionService =
     new CredentialEncryptionService(encryptionSecret);

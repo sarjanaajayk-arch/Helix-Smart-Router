@@ -21,10 +21,9 @@ export class ProviderCredentialsService {
     ) {}
 
     public async createCredential(
-        userId: string,
+        organizationId: string,
         request: CreateProviderCredentialRequest
     ): Promise<ProviderCredentialModel> {
-
         const errors = this.validator.validateCreate(request);
 
         if (errors.length > 0) {
@@ -32,7 +31,7 @@ export class ProviderCredentialsService {
         }
 
         const exists = await this.repository.exists(
-            userId,
+            organizationId,
             request.provider,
             request.displayName
         );
@@ -47,7 +46,7 @@ export class ProviderCredentialsService {
             this.encryptionService.encryptCredential(request.credential);
 
         return this.repository.create({
-            userId,
+            organizationId: organizationId,
             provider: request.provider,
             authType: request.authType,
             displayName: request.displayName,
@@ -61,7 +60,6 @@ export class ProviderCredentialsService {
         id: string,
         request: UpdateProviderCredentialRequest
     ): Promise<ProviderCredentialModel | null> {
-
         const errors = this.validator.validateUpdate(request);
 
         if (errors.length > 0) {
@@ -101,15 +99,15 @@ export class ProviderCredentialsService {
     }
 
     public async listCredentials(
-        userId: string
+        organizationId: string
     ): Promise<ProviderCredentialSummary[]> {
+        // Calls findByOrganizationId on repository passing organizationId to align with repo interface
+        const credentials: ProviderCredentialModel[] =
+            await this.repository.findByOrganizationId(organizationId);
 
-        const credentials =
-            await this.repository.findByUserId(userId);
-
-        return credentials.map((credential) => ({
+        return credentials.map((credential: ProviderCredentialModel) => ({
             id: credential.id,
-            userId: credential.userId,
+            userId: (credential as any).userId ?? organizationId,
             provider: credential.provider,
             authType: credential.authType,
             displayName: credential.displayName,
@@ -122,39 +120,37 @@ export class ProviderCredentialsService {
 
     /**
      * Returns the active credential including the encrypted secret.
-     * This is used internally by the Smart Router / BYOK integration.
+     * Used internally by the Smart Router / BYOK integration.
      */
     public async getActiveCredential(
-    userId: string,
-    provider: CreateProviderCredentialRequest["provider"]
-): Promise<ProviderCredentialModel | null> {
+        organizationId: string,
+        provider: CreateProviderCredentialRequest["provider"]
+    ): Promise<ProviderCredentialModel | null> {
+        const credentials: ProviderCredentialModel[] =
+            await this.repository.findByProvider(
+                organizationId,
+                provider
+            );
 
-    const credentials =
-        await this.repository.findByProvider(
-            userId,
-            provider
+        const credential = credentials.find(
+            (c) => c.status === CredentialStatus.ACTIVE
         );
 
-    const credential = credentials.find(
-        c => c.status === CredentialStatus.ACTIVE
-    );
+        if (!credential) {
+            return null;
+        }
 
-    if (!credential) {
-        return null;
+        return {
+            ...credential,
+            credential: this.encryptionService.decryptCredential(
+                credential.credential
+            ),
+        };
     }
-
-    return {
-        ...credential,
-        credential: this.encryptionService.decryptCredential(
-            credential.credential
-        ),
-    };
-}
 
     public async testCredential(
         id: string
     ): Promise<TestConnectionResult> {
-
         const credential =
             await this.repository.findById(id);
 

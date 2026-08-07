@@ -2,7 +2,7 @@ import { helixLogger } from "../config/logger";
 import { ProviderType } from "../types/ProviderType";
 import { getModelPricing, calculateCost, ModelPricing } from "../config/pricing";
 import { TokenAccounting } from "../orchestrator/TokenAccounting";
-
+import { usageRepository } from "../usage/UsageRepository";
 export interface UsageRecord {
     requestId: string;
     apiKeyId: string;
@@ -56,8 +56,11 @@ class UsageMeter {
     /**
      * Record usage for a completed request
      */
-    recordUsage(record: UsageRecord): void {
-        this.usageRecords.push(record);
+    async recordUsage(record: UsageRecord): Promise<void> {
+        await usageRepository.save(record);
+
+// Keep the in-memory copy temporarily
+this.usageRecords.push(record);
         
         // Trim old records if we exceed max
         if (this.usageRecords.length > this.maxRecords) {
@@ -79,7 +82,7 @@ class UsageMeter {
     /**
      * Record usage from a request/response
      */
-    recordRequestUsage(params: {
+    async recordRequestUsage(params: {
         requestId: string;
         apiKeyId: string;
         provider: string;
@@ -89,7 +92,7 @@ class UsageMeter {
         latencyMs: number;
         success: boolean;
         errorMessage?: string;
-    }): void {
+    }): Promise<void> {
         const promptTokens = TokenAccounting.estimateTokens(params.prompt);
         const completionTokens = TokenAccounting.estimateTokens(params.response);
         const totalTokens = promptTokens + completionTokens;
@@ -114,7 +117,7 @@ class UsageMeter {
             errorMessage: params.errorMessage
         };
 
-        this.recordUsage(record);
+        await this.recordUsage(record);
     }
 
     /**

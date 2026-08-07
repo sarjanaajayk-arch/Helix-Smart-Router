@@ -1,46 +1,65 @@
-import { Router } from 'express';
+import { Router } from "express";
 
-import { ProviderCredentialsController } from '../controllers/ProviderCredentialsController';
+import { ProviderCredentialsController } from "../controllers/ProviderCredentialsController";
 
 export function createProviderCredentialsRoutes(
     controller: ProviderCredentialsController
 ): Router {
 
+    console.log("✅ BYOK ROUTES CREATED");
+
     const router = Router();
 
-    // Create credential
+    router.use((req, _res, next) => {
+        console.log("🔥 BYOK ROUTE HIT");
+        next();
+    });
+
+    /**
+     * Create Provider Credential
+     */
     router.post(
-        '/users/:userId/credentials',
+        "/organizations/:organizationId/credentials",
         controller.createCredential
     );
 
-    // List credentials
+    /**
+     * List Provider Credentials
+     */
     router.get(
-        '/users/:userId/credentials',
+        "/organizations/:organizationId/credentials",
         controller.listCredentials
     );
 
-    // Get credential
+    /**
+     * Get Credential
+     */
     router.get(
-        '/credentials/:id',
+        "/credentials/:id",
         controller.getCredential
     );
 
-    // Update credential
+    /**
+     * Update Credential
+     */
     router.put(
-        '/credentials/:id',
+        "/credentials/:id",
         controller.updateCredential
     );
 
-    // Delete credential
+    /**
+     * Delete Credential
+     */
     router.delete(
-        '/credentials/:id',
+        "/credentials/:id",
         controller.deleteCredential
     );
 
-    // Test credential
+    /**
+     * Test Credential
+     */
     router.post(
-        '/credentials/:id/test',
+        "/credentials/:id/test",
         controller.testCredential
     );
 

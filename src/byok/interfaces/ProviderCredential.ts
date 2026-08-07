@@ -2,7 +2,7 @@ import {
     AuthenticationType,
     CredentialStatus,
     ProviderType
-} from '../types/ProviderCredentialTypes';
+} from "../types/ProviderCredentialTypes";
 
 /**
  * Represents a stored BYOK provider credential.
@@ -11,7 +11,10 @@ import {
 export interface ProviderCredential {
     id: string;
 
-    userId: string;
+    /**
+     * Organization that owns this credential.
+     */
+    organizationId: string;
 
     provider: ProviderType;
 

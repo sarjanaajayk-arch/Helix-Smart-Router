@@ -12,7 +12,7 @@ import {
 import { TaskType } from "./types/TaskType";
 import { PROVIDERS } from "./orchestrator/ProviderRegistry";
 import { HealthMonitor } from "./orchestrator/HealthMonitor";
-
+import membershipRoutes from "./memberships/routes/MembershipRoutes";
 import metricsRoutes from "./routes/metricsRoutes";
 import streamRoutes from "./routes/streamRoutes";
 import openaiRoutes from "./routes/openai";
@@ -20,7 +20,7 @@ import dashboardRoutes from "./routes/dashboardRoutes";
 import readyRoutes from "./routes/readyRoutes";
 import { createProviderCredentialsRoutes } from "./byok/routes/providerCredentialsRoutes";
 import { byokContainer } from "./integrations/byok/ByokContainer";
-
+import apiKeyRoutes from "./apiKeys/routes/ApiKeyRoutes";
 import { ProviderCredentialsController } from "./byok/controllers/ProviderCredentialsController";
 import { requestIdMiddleware } from "./middlewares/requestIdMiddleware";
 import { requestLoggingMiddleware } from "./middlewares/requestLoggingMiddleware";
@@ -30,16 +30,7 @@ import {
     configureRateLimit,
 } from "./middlewares/rateLimitMiddleware";
 
-
 const app = express();
-app.use((req, _res, next) => {
-    
-    next();
-});
-/* --------------------------------- */
-/* Core Services */
-/* --------------------------------- */
-
 
 /* --------------------------------- */
 /* BYOK Services */
@@ -75,14 +66,23 @@ configureAuth({
 });
 
 /* --------------------------------- */
-/* Middleware */
+/* Base Parsers & Middleware */
 /* --------------------------------- */
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json()); // Essential: Must be loaded BEFORE reading req.body
+
+// Debug middleware moved here so req.body is fully parsed
+
+
+/* --------------------------------- */
+/* Unprotected / Early Routes */
+/* --------------------------------- */
+
 app.use("/auth", authRoutes);
 app.use("/organizations", organizationRoutes);
-
+app.use("/memberships", membershipRoutes);
+app.use("/api-keys", apiKeyRoutes);
 
 console.log("✅ Organizations route mounted");
 
@@ -107,37 +107,32 @@ app.use(rateLimitMiddleware);
 app.use(authMiddleware);
 
 /* --------------------------------- */
-/* Routes */
+/* Protected Routes */
 /* --------------------------------- */
 
 app.use("/metrics", metricsRoutes);
 app.use("/chat", streamRoutes);
 app.use("/dashboard", dashboardRoutes);
 app.use("/ready", readyRoutes);
-
-
 app.use("/", openaiRoutes);
-
-
 app.use("/byok", providerCredentialsRoutes);
-
-
+app.post("/byok/test", (_req, res) => {
+    res.json({
+        success: true,
+        message: "BYOK TEST WORKING"
+    });
+});
 /* --------------------------------- */
-/* Root */
+/* Root & Health */
 /* --------------------------------- */
 
 app.get("/", (_, res) => {
     res.status(200).json({
         message: "🚀 Helix API is running",
-
         version: "1.0.0",
         status: "OK",
     });
 });
-
-/* --------------------------------- */
-/* Health */
-/* --------------------------------- */
 
 app.get("/health", (_, res) => {
     res.status(200).json({
@@ -171,6 +166,7 @@ Explain the algorithm, time complexity, and include unit tests.`,
         }
     });
 }
+
 /* --------------------------------- */
 /* Start Server */
 /* --------------------------------- */
@@ -188,8 +184,6 @@ async function startServer(): Promise<void> {
             );
         });
 
-        
-
         server.on("close", () => {
             console.log("❌ SERVER CLOSED");
         });
@@ -200,9 +194,5 @@ async function startServer(): Promise<void> {
         process.exit(1);
     }
 }
-
-
-
-
 
 startServer();

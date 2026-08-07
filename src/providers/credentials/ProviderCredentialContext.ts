@@ -2,9 +2,9 @@ import { ProviderType } from "../../types/ProviderType";
 
 export interface ProviderCredentialContext {
     /**
-     * Owner of the credential.
+     * Organization that owns the credential.
      */
-    userId: string;
+    organizationId: string;
 
     /**
      * AI provider.
@@ -12,7 +12,7 @@ export interface ProviderCredentialContext {
     provider: ProviderType;
 
     /**
-     * User's decrypted API key.
+     * Organization's decrypted API key.
      */
     apiKey: string;
 

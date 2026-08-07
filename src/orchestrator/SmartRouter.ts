@@ -226,12 +226,12 @@ export class SmartRouter {
             const apiKeyId =
                 request.apiKeyId || "unknown";
 
-            usageMeter.recordRequestUsage({
+            await usageMeter.recordRequestUsage({
                 requestId:
                     request.requestId || `req-${Date.now()}`,
                 apiKeyId,
-                provider: context.provider!,
-                model: context.selectedModel!,
+                provider: response?.provider ?? context.provider!,
+                model: response?.model ?? context.selectedModel!,
                 prompt: request.prompt,
                 response: response?.content || "",
                 latencyMs,

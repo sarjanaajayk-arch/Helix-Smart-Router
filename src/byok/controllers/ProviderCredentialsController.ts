@@ -1,6 +1,6 @@
-import { Request, Response } from 'express';
+import { Request, Response } from "express";
 
-import { ProviderCredentialsService } from '../services/ProviderCredentialsService';
+import { ProviderCredentialsService } from "../services/ProviderCredentialsService";
 
 export class ProviderCredentialsController {
     constructor(
@@ -12,7 +12,7 @@ export class ProviderCredentialsController {
      */
     private getParam(value: string | string[] | undefined): string {
         if (!value) {
-            throw new Error('Missing route parameter.');
+            throw new Error("Missing route parameter.");
         }
 
         return Array.isArray(value) ? value[0] : value;
@@ -23,20 +23,24 @@ export class ProviderCredentialsController {
         res: Response
     ): Promise<void> => {
         try {
-            const userId = this.getParam(req.params.userId);
-
-            const credential = await this.service.createCredential(
-                userId,
-                req.body
+            const organizationId = this.getParam(
+                req.params.organizationId
             );
+
+            const credential =
+                await this.service.createCredential(
+                    organizationId,
+                    req.body
+                );
 
             res.status(201).json(credential);
         } catch (error) {
             res.status(400).json({
                 success: false,
-                error: error instanceof Error
-                    ? error.message
-                    : 'Unknown error.'
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error.",
             });
         }
     };
@@ -46,17 +50,23 @@ export class ProviderCredentialsController {
         res: Response
     ): Promise<void> => {
         try {
-            const userId = this.getParam(req.params.userId);
+            const organizationId = this.getParam(
+                req.params.organizationId
+            );
 
-            const credentials = await this.service.listCredentials(userId);
+            const credentials =
+                await this.service.listCredentials(
+                    organizationId
+                );
 
             res.status(200).json(credentials);
         } catch (error) {
             res.status(500).json({
                 success: false,
-                error: error instanceof Error
-                    ? error.message
-                    : 'Unknown error.'
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error.",
             });
         }
     };
@@ -68,12 +78,13 @@ export class ProviderCredentialsController {
         try {
             const id = this.getParam(req.params.id);
 
-            const credential = await this.service.getCredential(id);
+            const credential =
+                await this.service.getCredential(id);
 
             if (!credential) {
                 res.status(404).json({
                     success: false,
-                    error: 'Credential not found.'
+                    error: "Credential not found.",
                 });
                 return;
             }
@@ -82,9 +93,10 @@ export class ProviderCredentialsController {
         } catch (error) {
             res.status(500).json({
                 success: false,
-                error: error instanceof Error
-                    ? error.message
-                    : 'Unknown error.'
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error.",
             });
         }
     };
@@ -96,15 +108,16 @@ export class ProviderCredentialsController {
         try {
             const id = this.getParam(req.params.id);
 
-            const credential = await this.service.updateCredential(
-                id,
-                req.body
-            );
+            const credential =
+                await this.service.updateCredential(
+                    id,
+                    req.body
+                );
 
             if (!credential) {
                 res.status(404).json({
                     success: false,
-                    error: 'Credential not found.'
+                    error: "Credential not found.",
                 });
                 return;
             }
@@ -113,9 +126,10 @@ export class ProviderCredentialsController {
         } catch (error) {
             res.status(400).json({
                 success: false,
-                error: error instanceof Error
-                    ? error.message
-                    : 'Unknown error.'
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error.",
             });
         }
     };
@@ -127,12 +141,13 @@ export class ProviderCredentialsController {
         try {
             const id = this.getParam(req.params.id);
 
-            const deleted = await this.service.deleteCredential(id);
+            const deleted =
+                await this.service.deleteCredential(id);
 
             if (!deleted) {
                 res.status(404).json({
                     success: false,
-                    error: 'Credential not found.'
+                    error: "Credential not found.",
                 });
                 return;
             }
@@ -141,9 +156,10 @@ export class ProviderCredentialsController {
         } catch (error) {
             res.status(500).json({
                 success: false,
-                error: error instanceof Error
-                    ? error.message
-                    : 'Unknown error.'
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error.",
             });
         }
     };
@@ -155,15 +171,17 @@ export class ProviderCredentialsController {
         try {
             const id = this.getParam(req.params.id);
 
-            const result = await this.service.testCredential(id);
+            const result =
+                await this.service.testCredential(id);
 
             res.status(200).json(result);
         } catch (error) {
             res.status(400).json({
                 success: false,
-                error: error instanceof Error
-                    ? error.message
-                    : 'Unknown error.'
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error.",
             });
         }
     };

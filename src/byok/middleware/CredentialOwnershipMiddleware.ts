@@ -29,7 +29,7 @@ export class CredentialOwnershipMiddleware {
                 return;
             }
 
-            if (credential.userId !== userId) {
+            if (credential.organizationId !== userId) {
                 res.status(403).json({
                     success: false,
                     error: 'Access denied.'
