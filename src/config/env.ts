@@ -9,6 +9,10 @@ export const env = {
   GEMINI_MODEL: process.env.GEMINI_MODEL || "gemini-2.5-flash",
   OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || "",
   OPENROUTER_MODEL: process.env.OPENROUTER_MODEL || "openai/gpt-4.1-mini",
+  CORS_ORIGINS: (process.env.CORS_ORIGINS || "http://localhost:3000")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
 };
 
 // Minimal runtime validation for production-like environments

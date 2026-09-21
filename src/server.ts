@@ -20,6 +20,11 @@ import { requestIdMiddleware } from "./middlewares/requestIdMiddleware";
 import { requestLoggingMiddleware } from "./middlewares/requestLoggingMiddleware";
 import { authMiddleware, optionalAuthMiddleware, configureAuth } from "./middlewares/authMiddleware";
 import { rateLimitMiddleware, configureRateLimit } from "./middlewares/rateLimitMiddleware";
+import {
+ requestSecurityErrorHandler,
+ requestSecurityMiddleware,
+ REQUEST_BODY_LIMIT,
+} from "./middlewares/requestSecurityMiddleware";
 
 const app = express();
 
@@ -50,11 +55,18 @@ configureAuth({
 /* Middleware */
 /* --------------------------------- */
 
-app.use(cors());
-app.use(express.json());
-
 app.use(requestIdMiddleware);
 app.use(requestLoggingMiddleware);
+app.use(cors({ origin: env.CORS_ORIGINS }));
+app.use(requestSecurityMiddleware);
+app.use(express.json({ limit: REQUEST_BODY_LIMIT }));
+app.use(requestSecurityErrorHandler);
+
+/* --------------------------------- */
+/* Auth Middleware */
+/* --------------------------------- */
+
+app.use(authMiddleware);
 
 /* --------------------------------- */
 /* Rate Limit Middleware */
@@ -66,12 +78,6 @@ configureRateLimit({
 });
 
 app.use(rateLimitMiddleware);
-
-/* --------------------------------- */
-/* Auth Middleware */
-/* --------------------------------- */
-
-app.use(authMiddleware);
 
 /* --------------------------------- */
 /* Routes */

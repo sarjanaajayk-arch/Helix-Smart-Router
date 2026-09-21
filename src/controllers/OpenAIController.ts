@@ -8,9 +8,18 @@ import { OpenAIChatRequest } from "../models/OpenAIChatRequest";
 import { OpenAIChatResponse } from "../models/OpenAIChatResponse";
 import { RoutingRequest } from "../models/RoutingRequest";
 import { RoutingResponse } from "../models/RoutingResponse";
+import { ErrorNormalizer } from "../validation/ErrorNormalizer";
+import { ProviderType } from "../types/ProviderType";
 
 const providerManager = new ProviderManager();
 const smartRouter = new SmartRouter(providerManager);
+
+function getErrorProvider(error: unknown): ProviderType {
+    const provider = (error as { provider?: unknown })?.provider;
+    return Object.values(ProviderType).includes(provider as ProviderType)
+        ? provider as ProviderType
+        : ProviderType.GITHUB;
+}
 
 export class OpenAIController {
     static async chatCompletions(
@@ -23,13 +32,16 @@ export class OpenAIController {
             console.log(`[OpenAIController.chatCompletions] Incoming request.model: ${openaiRequest.model}`);
 
             if (!openaiRequest.model || !openaiRequest.messages) {
-                res.status(400).json({
-                    error: {
-                        message: "Model and messages are required",
-                        type: "invalid_request_error",
-                        code: "invalid_request",
-                    },
-                });
+                const normalized = ErrorNormalizer.normalize(
+                    new Error("Model and messages are required"),
+                    ProviderType.GITHUB
+                );
+                normalized.statusCode = 400;
+                normalized.openAIError.error.type = "invalid_request_error";
+                normalized.openAIError.error.code = "invalid_request";
+                res.status(normalized.statusCode).json(
+                    ErrorNormalizer.createErrorResponseWithRequestId(normalized, req.requestId)
+                );
                 return;
             }
 
@@ -62,22 +74,10 @@ export class OpenAIController {
 
             res.status(200).json(openaiResponse);
         } catch (error) {
-            console.error("OpenAI Chat Completions Error:", error);
-
-            if (error instanceof Error) {
-                console.error(error.stack);
-            }
-
-            res.status(500).json({
-                error: {
-                    message:
-                        error instanceof Error
-                            ? error.message
-                            : "Internal server error",
-                    type: "internal_error",
-                    code: "internal_error",
-                },
-            });
+            const normalized = ErrorNormalizer.normalize(error, getErrorProvider(error));
+            res.status(normalized.statusCode).json(
+                ErrorNormalizer.createErrorResponseWithRequestId(normalized, req.requestId)
+            );
         }
     }
 
@@ -181,16 +181,16 @@ export class OpenAIController {
             }
         } catch (error) {
             if (!clientDisconnected) {
-                console.error("[SSE] Streaming error:", error);
-                const errorMessage =
-                    error instanceof Error ? error.message : "Unknown streaming error";
-                // We'll just end with [DONE] on error as well
-                console.log("[SSE] Writing [DONE] on error");
+                const normalized = ErrorNormalizer.normalize(error, getErrorProvider(error));
+                const errorResponse = ErrorNormalizer.createErrorResponseWithRequestId(
+                    normalized,
+                    req.requestId
+                );
+                res.write(`data: ${JSON.stringify(errorResponse)}\n\n`);
                 res.write(`data: [DONE]\n\n`);
-                console.log("[SSE] Calling res.end() on error");
                 res.end();
             } else {
-                console.log("[SSE] Client disconnected during error, not sending response");
+                return;
             }
         }
     }
@@ -213,14 +213,10 @@ export class OpenAIController {
                 data: dataArray
             });
         } catch (error) {
-            console.error("OpenAI Models Error:", error);
-            res.status(500).json({
-                error: {
-                    message: error instanceof Error ? error.message : "Internal server error",
-                    type: "internal_error",
-                    code: "internal_error",
-                }
-            });
+            const normalized = ErrorNormalizer.normalize(error, getErrorProvider(error));
+            res.status(normalized.statusCode).json(
+                ErrorNormalizer.createErrorResponseWithRequestId(normalized, req.requestId)
+            );
         }
     }
 }

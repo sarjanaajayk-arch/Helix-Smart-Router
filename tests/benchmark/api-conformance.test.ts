@@ -47,6 +47,7 @@ app.get("/health", (_, res) => {
 
 describe("HCB PHASE 1: API CONFORMANCE BENCHMARK", () => {
   const authHeader = "Bearer test-key";
+  const supportedModel = "gemini-2.5-flash";
 
   // ============================================================
   // SECTION 1: REQUEST VALIDATION
@@ -67,7 +68,7 @@ describe("HCB PHASE 1: API CONFORMANCE BENCHMARK", () => {
       const res = await request(app)
         .post("/v1/chat/completions")
         .set("Authorization", authHeader)
-        .send({ model: "gpt-4" });
+        .send({ model: supportedModel });
 
       expect(res.status).toBe(400);
       expect(res.body.error.type).toBe("invalid_request_error");
@@ -77,7 +78,7 @@ describe("HCB PHASE 1: API CONFORMANCE BENCHMARK", () => {
       const res = await request(app)
         .post("/v1/chat/completions")
         .set("Authorization", authHeader)
-        .send({ model: "gpt-4", messages: [] });
+        .send({ model: supportedModel, messages: [] });
 
       expect(res.status).toBe(400);
     });
@@ -86,66 +87,75 @@ describe("HCB PHASE 1: API CONFORMANCE BENCHMARK", () => {
       const res = await request(app)
         .post("/v1/chat/completions")
         .set("Authorization", authHeader)
-        .send({ model: "gpt-4", messages: "not-an-array" });
+        .send({ model: supportedModel, messages: "not-an-array" });
 
       expect(res.status).toBe(400);
     });
 
-    // Note: Message content validation happens at provider level (returns 500)
-    // The validation middleware only checks top-level fields
-    it("should pass validation for messages missing role (provider returns 500)", async () => {
+    it("should reject messages missing role", async () => {
       const res = await request(app)
         .post("/v1/chat/completions")
         .set("Authorization", authHeader)
-        .send({ model: "gpt-4", messages: [{ content: "test" }] });
+        .send({ model: supportedModel, messages: [{ content: "test" }] });
 
-      // Validation passes, provider fails
-      expect([200, 401, 500, 502, 503]).toContain(res.status);
+      expect(res.status).toBe(400);
+      expect(res.body.error.type).toBe("invalid_request_error");
+      expect(res.body.error.code).toBe("validation_error");
     }, 10000);
 
-    it("should pass validation for messages missing content (provider returns 500)", async () => {
+    it("should reject messages missing content", async () => {
       const res = await request(app)
         .post("/v1/chat/completions")
         .set("Authorization", authHeader)
-        .send({ model: "gpt-4", messages: [{ role: "user" }] });
+        .send({ model: supportedModel, messages: [{ role: "user" }] });
 
-      expect([200, 401, 500, 502, 503]).toContain(res.status);
+      expect(res.status).toBe(400);
+      expect(res.body.error.type).toBe("invalid_request_error");
+      expect(res.body.error.code).toBe("validation_error");
     });
 
-    it("should pass validation for invalid role (provider returns 500)", async () => {
+    it("should reject messages with an invalid role", async () => {
       const res = await request(app)
         .post("/v1/chat/completions")
         .set("Authorization", authHeader)
-        .send({ model: "gpt-4", messages: [{ role: "invalid", content: "test" }] });
+        .send({ model: supportedModel, messages: [{ role: "invalid", content: "test" }] });
 
-      expect([200, 401, 500, 502, 503]).toContain(res.status);
+      expect(res.status).toBe(400);
+      expect(res.body.error.type).toBe("invalid_request_error");
+      expect(res.body.error.code).toBe("validation_error");
     });
 
-    it("should pass validation for null message (provider returns 500)", async () => {
+    it("should reject null messages", async () => {
       const res = await request(app)
         .post("/v1/chat/completions")
         .set("Authorization", authHeader)
-        .send({ model: "gpt-4", messages: [null] });
+        .send({ model: supportedModel, messages: [null] });
 
-      expect([200, 401, 500, 502, 503]).toContain(res.status);
+      expect(res.status).toBe(400);
+      expect(res.body.error.type).toBe("invalid_request_error");
+      expect(res.body.error.code).toBe("validation_error");
     });
 
-    it("should pass validation for non-object message (provider returns 500)", async () => {
+    it("should reject non-object messages", async () => {
       const res = await request(app)
         .post("/v1/chat/completions")
         .set("Authorization", authHeader)
-        .send({ model: "gpt-4", messages: ["string message"] });
+        .send({ model: supportedModel, messages: ["string message"] });
 
-      expect([200, 401, 500, 502, 503]).toContain(res.status);
+      expect(res.status).toBe(400);
+      expect(res.body.error.type).toBe("invalid_request_error");
+      expect(res.body.error.code).toBe("validation_error");
     });
 
-    it("should pass validation for empty object message (provider returns 500)", async () => {
+    it("should reject empty message objects", async () => {
       const res = await request(app)
         .post("/v1/chat/completions")
         .set("Authorization", authHeader)
-        .send({ model: "gpt-4", messages: [{}] });
+        .send({ model: supportedModel, messages: [{}] });
 
-      expect([200, 401, 500, 502, 503]).toContain(res.status);
+      expect(res.status).toBe(400);
+      expect(res.body.error.type).toBe("invalid_request_error");
+      expect(res.body.error.code).toBe("validation_error");
     });
   });
 
@@ -158,7 +168,7 @@ describe("HCB PHASE 1: API CONFORMANCE BENCHMARK", () => {
         .post("/v1/chat/completions")
         .set("Authorization", authHeader)
         .send({
-          model: "gpt-4",
+          model: supportedModel,
           messages: [{ role: "user", content: "test" }],
           temperature: 1.5,
         });
@@ -171,7 +181,7 @@ describe("HCB PHASE 1: API CONFORMANCE BENCHMARK", () => {
         .post("/v1/chat/completions")
         .set("Authorization", authHeader)
         .send({
-          model: "gpt-4",
+          model: supportedModel,
           messages: [{ role: "user", content: "test" }],
           temperature: 2.5,
         });
@@ -184,7 +194,7 @@ describe("HCB PHASE 1: API CONFORMANCE BENCHMARK", () => {
         .post("/v1/chat/completions")
         .set("Authorization", authHeader)
         .send({
-          model: "gpt-4",
+          model: supportedModel,
           messages: [{ role: "user", content: "test" }],
           temperature: -0.5,
         });
@@ -197,7 +207,7 @@ describe("HCB PHASE 1: API CONFORMANCE BENCHMARK", () => {
         .post("/v1/chat/completions")
         .set("Authorization", authHeader)
         .send({
-          model: "gpt-4",
+          model: supportedModel,
           messages: [{ role: "user", content: "test" }],
           max_tokens: 1000,
         });
@@ -210,7 +220,7 @@ describe("HCB PHASE 1: API CONFORMANCE BENCHMARK", () => {
         .post("/v1/chat/completions")
         .set("Authorization", authHeader)
         .send({
-          model: "gpt-4",
+          model: supportedModel,
           messages: [{ role: "user", content: "test" }],
           max_tokens: 50000,
         });
@@ -223,7 +233,7 @@ describe("HCB PHASE 1: API CONFORMANCE BENCHMARK", () => {
         .post("/v1/chat/completions")
         .set("Authorization", authHeader)
         .send({
-          model: "gpt-4",
+          model: supportedModel,
           messages: [{ role: "user", content: "test" }],
           max_tokens: 0,
         });
@@ -236,7 +246,7 @@ describe("HCB PHASE 1: API CONFORMANCE BENCHMARK", () => {
         .post("/v1/chat/completions")
         .set("Authorization", authHeader)
         .send({
-          model: "gpt-4",
+          model: supportedModel,
           messages: [{ role: "user", content: "test" }],
           top_p: 0.9,
         });
@@ -249,7 +259,7 @@ describe("HCB PHASE 1: API CONFORMANCE BENCHMARK", () => {
         .post("/v1/chat/completions")
         .set("Authorization", authHeader)
         .send({
-          model: "gpt-4",
+          model: supportedModel,
           messages: [{ role: "user", content: "test" }],
           top_p: 1.5,
         });
@@ -262,7 +272,7 @@ describe("HCB PHASE 1: API CONFORMANCE BENCHMARK", () => {
         .post("/v1/chat/completions")
         .set("Authorization", authHeader)
         .send({
-          model: "gpt-4",
+          model: supportedModel,
           messages: [{ role: "user", content: "test" }],
           top_p: -0.1,
         });
@@ -281,7 +291,7 @@ describe("HCB PHASE 1: API CONFORMANCE BENCHMARK", () => {
         .post("/v1/chat/completions")
         .set("Authorization", authHeader)
         .send({
-          model: "gpt-4",
+          model: supportedModel,
           messages: [{ role: "user", content: "test" }],
           stream: "yes",
         });
@@ -294,7 +304,7 @@ describe("HCB PHASE 1: API CONFORMANCE BENCHMARK", () => {
         .post("/v1/chat/completions")
         .set("Authorization", authHeader)
         .send({
-          model: "gpt-4",
+          model: supportedModel,
           messages: [{ role: "user", content: "test" }],
           user: "user-123",
         });
@@ -307,7 +317,7 @@ describe("HCB PHASE 1: API CONFORMANCE BENCHMARK", () => {
         .post("/v1/chat/completions")
         .set("Authorization", authHeader)
         .send({
-          model: "gpt-4",
+          model: supportedModel,
           messages: [{ role: "user", content: "test" }],
           user: 123,
         });
@@ -326,7 +336,7 @@ describe("HCB PHASE 1: API CONFORMANCE BENCHMARK", () => {
         .post("/v1/chat/completions")
         .set("Authorization", authHeader)
         .send({
-          model: "gpt-4",
+          model: supportedModel,
           messages: [{ role: "user", content: "test" }],
           stream: false,
         });
@@ -359,7 +369,7 @@ describe("HCB PHASE 1: API CONFORMANCE BENCHMARK", () => {
         .post("/v1/chat/completions")
         .set("Authorization", authHeader)
         .send({
-          model: "gpt-4",
+          model: supportedModel,
           messages: [{ role: "user", content: "test" }],
           stream: false,
         });
@@ -375,7 +385,7 @@ describe("HCB PHASE 1: API CONFORMANCE BENCHMARK", () => {
         .post("/v1/chat/completions")
         .set("Authorization", authHeader)
         .send({
-          model: "gpt-4",
+          model: supportedModel,
           messages: [{ role: "user", content: "test" }],
           stream: false,
         });
@@ -431,7 +441,7 @@ describe("HCB PHASE 1: API CONFORMANCE BENCHMARK", () => {
     it("should return OpenAI-compatible 401 error", async () => {
       const res = await request(app)
         .post("/v1/chat/completions")
-        .send({ model: "gpt-4", messages: [{ role: "user", content: "test" }] });
+        .send({ model: supportedModel, messages: [{ role: "user", content: "test" }] });
 
       expect(res.status).toBe(401);
       expect(res.body).toHaveProperty("error");
@@ -444,7 +454,7 @@ describe("HCB PHASE 1: API CONFORMANCE BENCHMARK", () => {
       const res = await request(app)
         .post("/v1/chat/completions")
         .set("Authorization", authHeader)
-        .send({ model: "gpt-4", messages: "not-array" });
+        .send({ model: supportedModel, messages: "not-array" });
 
       expect(res.status).toBe(400);
       expect(res.body).toHaveProperty("error");
@@ -458,7 +468,7 @@ describe("HCB PHASE 1: API CONFORMANCE BENCHMARK", () => {
       const res = await request(app)
         .post("/v1/chat/completions")
         .set("Authorization", "Bearer invalid-rate-limit-key")
-        .send({ model: "gpt-4", messages: [{ role: "user", content: "test" }] });
+        .send({ model: supportedModel, messages: [{ role: "user", content: "test" }] });
 
       if (res.status === 429) {
         expect(res.body.error.type).toBe("rate_limit_error");
@@ -476,7 +486,7 @@ describe("HCB PHASE 1: API CONFORMANCE BENCHMARK", () => {
         .post("/v1/chat/completions")
         .set("Authorization", authHeader)
         .send({
-          model: "gpt-4",
+          model: supportedModel,
           messages: [
             { role: "system", content: "You are helpful" },
             { role: "user", content: "Hello" }
@@ -491,7 +501,7 @@ describe("HCB PHASE 1: API CONFORMANCE BENCHMARK", () => {
         .post("/v1/chat/completions")
         .set("Authorization", authHeader)
         .send({
-          model: "gpt-4",
+          model: supportedModel,
           messages: [
             { role: "user", content: "Hello" },
             { role: "assistant", content: "Hi there!" },
@@ -507,7 +517,7 @@ describe("HCB PHASE 1: API CONFORMANCE BENCHMARK", () => {
         .post("/v1/chat/completions")
         .set("Authorization", authHeader)
         .send({
-          model: "gpt-4",
+          model: supportedModel,
           messages: [{ role: "user", content: "" }],
         });
 
@@ -519,7 +529,7 @@ describe("HCB PHASE 1: API CONFORMANCE BENCHMARK", () => {
         .post("/v1/chat/completions")
         .set("Authorization", authHeader)
         .send({
-          model: "gpt-4",
+          model: supportedModel,
           messages: [{ role: "user", content: "x".repeat(100000) }],
         });
 
@@ -531,7 +541,7 @@ describe("HCB PHASE 1: API CONFORMANCE BENCHMARK", () => {
         .post("/v1/chat/completions")
         .set("Authorization", authHeader)
         .send({
-          model: "gpt-4",
+          model: supportedModel,
           messages: [{ role: "user", content: "你好世界 🌍 こんにちは" }],
         });
 
@@ -543,7 +553,7 @@ describe("HCB PHASE 1: API CONFORMANCE BENCHMARK", () => {
         .post("/v1/chat/completions")
         .set("Authorization", authHeader)
         .send({
-          model: "gpt-4",
+          model: supportedModel,
           messages: [{ role: "user", content: "Special: \\n\\t\\r\\\"\\'\\\\" }],
         });
 
@@ -556,7 +566,7 @@ describe("HCB PHASE 1: API CONFORMANCE BENCHMARK", () => {
   // ============================================================
   describe("Model Parameter Handling", () => {
     it("should pass model through to response", async () => {
-      const testModels = ["gpt-4", "gpt-3.5-turbo", "gemini-pro", "claude-3-opus"];
+      const testModels = [supportedModel, "gpt-3.5-turbo", "gemini-pro", "claude-3-opus"];
       
       for (const model of testModels) {
         const res = await request(app)
@@ -582,7 +592,9 @@ describe("HCB PHASE 1: API CONFORMANCE BENCHMARK", () => {
           messages: [{ role: "user", content: "test" }],
         });
 
-      expect(res.status).not.toBe(400);
+      expect(res.status).toBe(400);
+      expect(res.body.error.type).toBe("invalid_request_error");
+      expect(res.body.error.code).toBe("invalid_model");
     });
   });
 
@@ -594,7 +606,7 @@ describe("HCB PHASE 1: API CONFORMANCE BENCHMARK", () => {
       const res = await request(app)
         .post("/v1/chat/completions")
         .set("Authorization", "Bearer test-key")
-        .send({ model: "gpt-4", messages: [{ role: "user", content: "test" }] });
+        .send({ model: supportedModel, messages: [{ role: "user", content: "test" }] });
 
       expect(res.status).not.toBe(401);
     });
@@ -603,7 +615,7 @@ describe("HCB PHASE 1: API CONFORMANCE BENCHMARK", () => {
       const res = await request(app)
         .post("/v1/chat/completions")
         .set("x-api-key", "test-key")
-        .send({ model: "gpt-4", messages: [{ role: "user", content: "test" }] });
+        .send({ model: supportedModel, messages: [{ role: "user", content: "test" }] });
 
       expect(res.status).not.toBe(401);
     });
@@ -612,7 +624,7 @@ describe("HCB PHASE 1: API CONFORMANCE BENCHMARK", () => {
       const res = await request(app)
         .post("/v1/chat/completions")
         .set("Authorization", "Bearer invalid-key-xyz")
-        .send({ model: "gpt-4", messages: [{ role: "user", content: "test" }] });
+        .send({ model: supportedModel, messages: [{ role: "user", content: "test" }] });
 
       expect(res.status).toBe(401);
     });

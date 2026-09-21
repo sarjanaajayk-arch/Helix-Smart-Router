@@ -17,6 +17,14 @@ export interface NormalizedError extends Error {
     provider: ProviderType;
 }
 
+function redactSensitiveData(message: string): string {
+    return message
+        .replace(/Bearer\s+[^\s,;]+/gi, "Bearer [redacted]")
+        .replace(/(?:api[_ -]?key|token|secret|password)\s*[:=]\s*[^\s,;]+/gi, "$1: [redacted]")
+        .replace(/\bsk-[A-Za-z0-9_-]+\b/g, "[redacted]")
+        .replace(/\bAIza[\w-]+\b/g, "[redacted]");
+}
+
 /**
  * Normalizes provider-specific errors to OpenAI-compatible error format
  * This ensures consistent error responses across all providers
@@ -76,7 +84,6 @@ export class ErrorNormalizer {
 
         helixLogger.debug("Error normalized", {
             provider,
-            originalMessage: originalError.message,
             normalizedType: openAIType,
             normalizedCode: openAICode,
             statusCode,
@@ -95,7 +102,7 @@ export class ErrorNormalizer {
         message: string;
         param: string | null;
     } {
-        const message = error.message || "Unknown Gemini error";
+        const message = redactSensitiveData(error.message || "Unknown Gemini error");
 
         // Check for specific Gemini error patterns
         if (message.includes("API_KEY_INVALID") || message.includes("API key not valid")) {
@@ -198,7 +205,7 @@ export class ErrorNormalizer {
         message: string;
         param: string | null;
     } {
-        const message = error.message || "Unknown OpenRouter error";
+        const message = redactSensitiveData(error.message || "Unknown OpenRouter error");
 
         // OpenRouter often returns OpenAI-compatible errors already
         // But we normalize to ensure consistency
@@ -293,7 +300,7 @@ export class ErrorNormalizer {
             message: string;
             param: string | null;
         } {
-            const message = error.message || "Unknown error";
+            const message = redactSensitiveData(error.message || "Unknown error");
 
             // Timeout errors (must come first since ETIMEDOUT can match both)
             if (

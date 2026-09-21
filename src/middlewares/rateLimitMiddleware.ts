@@ -86,18 +86,30 @@ function defaultHandler(req: Request, res: Response, next: NextFunction): void {
     requestId: req.requestId,
     path: req.originalUrl,
     method: req.method,
-    keyPrefix: key.substring(0, 20) + "...",
+    authenticated: Boolean((req as any).apiKey),
     retryAfter,
   });
 
   res.setHeader("Retry-After", String(retryAfter));
+  const error: {
+    message: string;
+    type: "rate_limit_error";
+    code: string;
+    retry_after: number;
+    request_id?: string;
+  } = {
+    message: "Too many requests, please try again later",
+    type: "rate_limit_error",
+    code: "rate_limit_exceeded",
+    retry_after: retryAfter,
+  };
+
+  if (req.requestId) {
+    error.request_id = req.requestId;
+  }
+
   res.status(429).json({
-    error: {
-      message: "Too many requests, please try again later",
-      type: "rate_limit_error",
-      code: "rate_limit_exceeded",
-      retry_after: retryAfter,
-    },
+    error,
   });
 }
 

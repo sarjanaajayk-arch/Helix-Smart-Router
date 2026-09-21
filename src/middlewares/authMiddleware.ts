@@ -15,6 +15,9 @@ const DEFAULT_AUTH_CONFIG: AuthConfig = {
 
 let authConfig: AuthConfig = DEFAULT_AUTH_CONFIG;
 
+const UNSAFE_AUTH_VALUE_PATTERN = /[\u0000-\u001f\u007f]/;
+const STRICT_BEARER_PATTERN = /^Bearer [^\s]+$/;
+
 export function configureAuth(config: Partial<AuthConfig>): void {
   authConfig = { ...DEFAULT_AUTH_CONFIG, ...config };
   if (config.apiKeys) {
@@ -26,27 +29,80 @@ export function getAuthConfig(): Readonly<AuthConfig> {
   return { ...authConfig };
 }
 
+function getAuthenticationError(req: Request): string | null {
+  const authorization = req.headers.authorization;
+
+  if (authorization === undefined) {
+    return null;
+  }
+
+  if (
+    Array.isArray(authorization) ||
+    UNSAFE_AUTH_VALUE_PATTERN.test(authorization) ||
+    !STRICT_BEARER_PATTERN.test(authorization)
+  ) {
+    return "Malformed Authorization header";
+  }
+
+  return null;
+}
+
+function isSafeCredential(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    !UNSAFE_AUTH_VALUE_PATTERN.test(value) &&
+    !/\s/.test(value)
+  );
+}
+
 function extractApiKey(req: Request): string | undefined {
   const headerName = authConfig.headerName?.toLowerCase();
   if (headerName && req.headers[headerName]) {
     const val = req.headers[headerName];
-    return Array.isArray(val) ? val[0] : val;
+    const candidate = Array.isArray(val) ? val[0] : val;
+    return isSafeCredential(candidate) ? candidate : undefined;
   }
 
   const queryParamName = authConfig.queryParamName;
   if (queryParamName) {
     const queryVal = req.query[queryParamName] as string | string[] | undefined;
     if (queryVal !== undefined) {
-      return Array.isArray(queryVal) ? queryVal[0] : String(queryVal);
+      const candidate = Array.isArray(queryVal) ? queryVal[0] : String(queryVal);
+      return isSafeCredential(candidate) ? candidate : undefined;
     }
   }
 
   const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith("Bearer ")) {
+  if (typeof authHeader === "string" && STRICT_BEARER_PATTERN.test(authHeader)) {
     return authHeader.slice(7);
   }
 
   return undefined;
+}
+
+function sendAuthenticationError(
+  req: Request,
+  res: Response,
+  message: string,
+  code: string
+): void {
+  const error: {
+    message: string;
+    type: "authentication_error";
+    code: string;
+    request_id?: string;
+  } = {
+    message,
+    type: "authentication_error",
+    code,
+  };
+
+  if (req.requestId) {
+    error.request_id = req.requestId;
+  }
+
+  res.status(401).json({ error });
 }
 
 export function authMiddleware(
@@ -54,6 +110,17 @@ export function authMiddleware(
   res: Response,
   next: NextFunction
 ): void {
+  const authenticationError = getAuthenticationError(req);
+  if (authenticationError) {
+    helixLogger.warn("Authentication failed: malformed Authorization header", {
+      requestId: req.requestId,
+      path: req.originalUrl,
+      method: req.method,
+    });
+    sendAuthenticationError(req, res, authenticationError, "invalid_authorization");
+    return;
+  }
+
   if (authConfig.apiKeys.length === 0) {
     helixLogger.warn("Auth middleware active but no API keys configured");
     next();
@@ -68,13 +135,7 @@ export function authMiddleware(
       path: req.originalUrl,
       method: req.method,
     });
-    res.status(401).json({
-      error: {
-        message: "Missing API key",
-        type: "authentication_error",
-        code: "missing_api_key",
-      },
-    });
+    sendAuthenticationError(req, res, "Missing API key", "missing_api_key");
     return;
   }
 
@@ -83,22 +144,14 @@ export function authMiddleware(
       requestId: req.requestId,
       path: req.originalUrl,
       method: req.method,
-      keyPrefix: apiKey.slice(0, 8) + "...",
     });
-    res.status(401).json({
-      error: {
-        message: "Invalid API key",
-        type: "authentication_error",
-        code: "invalid_api_key",
-      },
-    });
+    sendAuthenticationError(req, res, "Invalid API key", "invalid_api_key");
     return;
   }
 
   helixLogger.debug("Authentication successful", {
     requestId: req.requestId,
     path: req.originalUrl,
-    keyPrefix: apiKey.slice(0, 8) + "...",
   });
 
   (req as any).apiKey = apiKey;
@@ -121,7 +174,6 @@ export function optionalAuthMiddleware(
     (req as any).apiKey = apiKey;
     helixLogger.debug("Optional authentication successful", {
       requestId: req.requestId,
-      keyPrefix: apiKey.slice(0, 8) + "...",
     });
   }
 

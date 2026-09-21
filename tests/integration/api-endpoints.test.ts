@@ -116,11 +116,12 @@ describe("Integration Tests - API Endpoints", () => {
       const res = await request(app)
         .post("/v1/chat/completions")
         .set("Authorization", "Bearer test-key")
-        .send({ model: "gemini-pro", messages: [{ content: "missing role" }] });
+        .send({ model: "gemini-2.5-flash", messages: [{ content: "missing role" }] });
       
-      // Validation middleware only checks top-level fields, not message structure
-      // This will pass validation but fail at provider level
-      expect(res.status).not.toBe(400);
+      expect(res.status).toBe(400);
+      expect(res.body).toHaveProperty("error");
+      expect(res.body.error.type).toBe("invalid_request_error");
+      expect(res.body.error.code).toBe("validation_error");
     }, 10000);
   });
 });
